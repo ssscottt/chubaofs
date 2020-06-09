@@ -140,24 +140,24 @@ func CreateDataPartition(dpCfg *dataPartitionCfg, disk *Disk, request *proto.Cre
 	return
 }
 
-func (dp *DataPartition)IsEquareCreateDataPartitionRequst(request *proto.CreateDataPartitionRequest) (err error){
-	if len(dp.config.Peers)!=len(request.Members){
-		return fmt.Errorf("Exsit unavali Partition(%v) partitionHosts(%v) requestHosts(%v)", dp.partitionID, dp.config.Peers,request.Members)
+func (dp *DataPartition) IsEquareCreateDataPartitionRequst(request *proto.CreateDataPartitionRequest) (err error) {
+	if len(dp.config.Peers) != len(request.Members) {
+		return fmt.Errorf("Exsit unavali Partition(%v) partitionHosts(%v) requestHosts(%v)", dp.partitionID, dp.config.Peers, request.Members)
 	}
-	for index,host:=range dp.config.Hosts{
-		requestHost:=request.Hosts[index]
-		if host!=requestHost {
-			return fmt.Errorf("Exsit unavali Partition(%v) partitionHosts(%v) requestHosts(%v)",dp.partitionID,dp.config.Hosts,request.Hosts)
+	for index, host := range dp.config.Hosts {
+		requestHost := request.Hosts[index]
+		if host != requestHost {
+			return fmt.Errorf("Exsit unavali Partition(%v) partitionHosts(%v) requestHosts(%v)", dp.partitionID, dp.config.Hosts, request.Hosts)
 		}
 	}
-	for index,peer:=range dp.config.Peers {
-		requestPeer:=request.Members[index]
-		if requestPeer.ID!=peer.ID || requestPeer.Addr!=peer.Addr{
-			return fmt.Errorf("Exsit unavali Partition(%v) partitionHosts(%v) requestHosts(%v)",dp.partitionID,dp.config.Peers,request.Members)
+	for index, peer := range dp.config.Peers {
+		requestPeer := request.Members[index]
+		if requestPeer.ID != peer.ID || requestPeer.Addr != peer.Addr {
+			return fmt.Errorf("Exsit unavali Partition(%v) partitionHosts(%v) requestHosts(%v)", dp.partitionID, dp.config.Peers, request.Members)
 		}
 	}
-	if dp.config.VolName!=request.VolumeId {
-		return fmt.Errorf("Exsit unavali Partition(%v) VolName(%v) requestVolName(%v)",dp.partitionID,dp.config.VolName,request.VolumeId)
+	if dp.config.VolName != request.VolumeId {
+		return fmt.Errorf("Exsit unavali Partition(%v) VolName(%v) requestVolName(%v)", dp.partitionID, dp.config.VolName, request.VolumeId)
 	}
 
 	return
@@ -698,7 +698,7 @@ func (dp *DataPartition) doStreamFixTinyDeleteRecord(repairTask *DataPartitionRe
 		conn                    *net.TCPConn
 	)
 	if !isFullSync {
-		if localTinyDeleteFileSize,err = dp.extentStore.LoadTinyDeleteFileOffset();err!=nil {
+		if localTinyDeleteFileSize, err = dp.extentStore.LoadTinyDeleteFileOffset(); err != nil {
 			return
 		}
 
@@ -768,5 +768,11 @@ func (dp *DataPartition) doStreamFixTinyDeleteRecord(repairTask *DataPartitionRe
 // ChangeRaftMember is a wrapper function of changing the raft member.
 func (dp *DataPartition) ChangeRaftMember(changeType raftProto.ConfChangeType, peer raftProto.Peer, context []byte) (resp interface{}, err error) {
 	resp, err = dp.raftPartition.ChangeMember(changeType, peer, context)
+	return
+}
+
+// ResetRaftMember is a wrapper function of changing the raft member.
+func (dp *DataPartition) ResetRaftMember(peers []raftProto.Peer, context []byte) (err error) {
+	err = dp.raftPartition.ResetMember(peers, context)
 	return
 }

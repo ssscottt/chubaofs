@@ -26,6 +26,10 @@ const (
 	CliOpSet          = "set"
 	CliOpDecommission = "decommission"
 	CliOpDownloadZip  = "load"
+	CliOpFreeze       = "freeze"
+	CliOpSetThreshold = "threshold"
+	CliOpCheck        = "check"
+	CliOpReset        = "reset"
 
 	//Shorthand format of operation name
 	CliOpDecommissionShortHand = "dec"

@@ -42,6 +42,7 @@ func newMetaNodeCmd(client *master.MasterClient) *cobra.Command {
 
 const (
 	cmdMetaNodeListShort = "List information of meta nodes"
+	cmdMetaNodeInfoShort = "Show information of meta nodes"
 )
 
 func newMetaNodeListCmd(client *master.MasterClient) *cobra.Command {
@@ -83,5 +84,38 @@ func newMetaNodeListCmd(client *master.MasterClient) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&optFilterWritable, "filter-writable", "", "Filter node writable status")
 	cmd.Flags().StringVar(&optFilterStatus, "filter-status", "", "Filter status [Active, Inactive")
+	return cmd
+}
+
+func newMetaNodeInfoCmd(client *master.MasterClient) *cobra.Command {
+	var cmd = &cobra.Command{
+		Use:   CliOpInfo + " [NODE ADDRESS]",
+		Short: cmdMetaNodeInfoShort,
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			var err error
+			var nodeAddr string
+			var metanodeInfo *proto.MetaNodeInfo
+			defer func() {
+				if err != nil {
+					errout("Show meta node info failed: %v\n", err)
+					os.Exit(1)
+				}
+			}()
+			nodeAddr = args[0]
+			if metanodeInfo, err = client.NodeAPI().GetMetaNode(nodeAddr); err != nil {
+				return
+			}
+			stdout("[Meta node info]\n")
+			stdout(formatMetaNodeDetail(metanodeInfo))
+
+		},
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) != 0 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return validMetaNodes(client, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+	}
 	return cmd
 }

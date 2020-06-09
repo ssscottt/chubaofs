@@ -492,6 +492,43 @@ func (m *Server) decommissionDataPartition(w http.ResponseWriter, r *http.Reques
 	sendOkReply(w, r, newSuccessHTTPReply(rstMsg))
 }
 
+func (m *Server) resetDataPartition(w http.ResponseWriter, r *http.Request) {
+	var (
+		dp          *DataPartition
+		partitionID uint64
+		volName     string
+		vol         *Vol
+		rstMsg      string
+		err         error
+	)
+	if partitionID, volName, err = parseRequestToGetDataPartition(r); err != nil {
+		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
+		return
+	}
+
+	if volName != "" {
+		if vol, err = m.cluster.getVol(volName); err != nil {
+			sendErrReply(w, r, newErrHTTPReply(proto.ErrDataPartitionNotExists))
+			return
+		}
+		if dp, err = vol.getDataPartitionByID(partitionID); err != nil {
+			sendErrReply(w, r, newErrHTTPReply(proto.ErrDataPartitionNotExists))
+			return
+		}
+	} else {
+		if dp, err = m.cluster.getDataPartitionByID(partitionID); err != nil {
+			sendErrReply(w, r, newErrHTTPReply(proto.ErrDataPartitionNotExists))
+			return
+		}
+	}
+	if err = m.cluster.resetDataPartition(dp); err != nil {
+		sendErrReply(w, r, newErrHTTPReply(err))
+		return
+	}
+	rstMsg = fmt.Sprintf(proto.AdminResetDataPartition+" dataPartitionID :%v  volume:%v successfully", partitionID, volName)
+	sendOkReply(w, r, newSuccessHTTPReply(rstMsg))
+}
+
 // Mark the volume as deleted, which will then be deleted later.
 func (m *Server) markDeleteVol(w http.ResponseWriter, r *http.Request) {
 	var (

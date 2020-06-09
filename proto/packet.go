@@ -111,6 +111,7 @@ const (
 	OpMetaPartitionTryToLeader      uint8 = 0x48
 	OpSetMetaNodeParams             uint8 = 0x49
 	OpGetMetaNodeParams             uint8 = 0x4A
+	OpResetMetaPartitionRaftMember  uint8 = 0x4B
 
 	// Operations: Master -> DataNode
 	OpCreateDataPartition           uint8 = 0x60
@@ -123,6 +124,7 @@ const (
 	OpAddDataPartitionRaftMember    uint8 = 0x67
 	OpRemoveDataPartitionRaftMember uint8 = 0x68
 	OpDataPartitionTryToLeader      uint8 = 0x69
+	OpResetDataPartitionRaftMember  uint8 = 0x6A
 
 	// Operations: MultipartInfo
 	OpCreateMultipart  uint8 = 0x70
@@ -343,10 +345,14 @@ func (p *Packet) GetOpMsg() (m string) {
 		m = "OpRemoveDataPartitionRaftMember"
 	case OpAddDataPartitionRaftMember:
 		m = "OpAddDataPartitionRaftMember"
+	case OpResetDataPartitionRaftMember:
+		m = "OpResetDataPartitionRaftMember"
 	case OpAddMetaPartitionRaftMember:
 		m = "OpAddMetaPartitionRaftMember"
 	case OpRemoveMetaPartitionRaftMember:
 		m = "OpRemoveMetaPartitionRaftMember"
+	case OpResetMetaPartitionRaftMember:
+		m = "OpResetMetaPartitionRaftMember"
 	case OpMetaPartitionTryToLeader:
 		m = "OpMetaPartitionTryToLeader"
 	case OpDataPartitionTryToLeader:
@@ -382,7 +388,7 @@ func (p *Packet) GetOpMsg() (m string) {
 	case OpGetMetaNodeParams:
 		m = "OpGetMetaNodeParams"
 	case OpBatchDeleteExtent:
-		m="OpBatchDeleteExtent"
+		m = "OpBatchDeleteExtent"
 	}
 	return
 }
@@ -639,7 +645,7 @@ func (p *Packet) GetUniqueLogId() (m string) {
 			return m
 		}
 	} else if p.Opcode == OpReadTinyDeleteRecord || p.Opcode == OpNotifyReplicasToRepair || p.Opcode == OpDataNodeHeartbeat ||
-		p.Opcode==OpLoadDataPartition || p.Opcode==OpBatchDeleteExtent {
+		p.Opcode == OpLoadDataPartition || p.Opcode == OpBatchDeleteExtent {
 		p.mesg += fmt.Sprintf("Opcode(%v)", p.GetOpMsg())
 		return
 	} else if p.Opcode == OpBroadcastMinAppliedID || p.Opcode == OpGetAppliedId {
@@ -670,7 +676,7 @@ func (p *Packet) setPacketPrefix() {
 			return
 		}
 	} else if p.Opcode == OpReadTinyDeleteRecord || p.Opcode == OpNotifyReplicasToRepair || p.Opcode == OpDataNodeHeartbeat ||
-		p.Opcode==OpLoadDataPartition || p.Opcode==OpBatchDeleteExtent {
+		p.Opcode == OpLoadDataPartition || p.Opcode == OpBatchDeleteExtent {
 		p.mesg += fmt.Sprintf("Opcode(%v)", p.GetOpMsg())
 		return
 	} else if p.Opcode == OpBroadcastMinAppliedID || p.Opcode == OpGetAppliedId {
@@ -698,11 +704,11 @@ func (p *Packet) IsForwardPkt() bool {
 func (p *Packet) LogMessage(action, remote string, start int64, err error) (m string) {
 	if err == nil {
 		m = fmt.Sprintf("id[%v] isPrimaryBackReplLeader[%v] remote[%v] "+
-			" cost[%v] ",p.GetUniqueLogId(),p.IsForwardPkt(), remote,(time.Now().UnixNano()-start)/1e6 )
+			" cost[%v] ", p.GetUniqueLogId(), p.IsForwardPkt(), remote, (time.Now().UnixNano()-start)/1e6)
 
 	} else {
 		m = fmt.Sprintf("id[%v] isPrimaryBackReplLeader[%v] remote[%v]"+
-			", err[%v]", p.GetUniqueLogId(), p.IsForwardPkt(),remote, err.Error())
+			", err[%v]", p.GetUniqueLogId(), p.IsForwardPkt(), remote, err.Error())
 	}
 
 	return
