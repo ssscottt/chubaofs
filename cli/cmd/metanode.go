@@ -36,6 +36,7 @@ func newMetaNodeCmd(client *master.MasterClient) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newMetaNodeListCmd(client),
+		newMetaNodeInfoCmd(client),
 	)
 	return cmd
 }

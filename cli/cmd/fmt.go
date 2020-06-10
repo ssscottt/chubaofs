@@ -293,10 +293,10 @@ func formatTime(timeUnix int64) string {
 func formatReplica(indentation string, replica *proto.DataReplica) string {
 	var sb = strings.Builder{}
 	sb.WriteString(fmt.Sprintf("%vStatus           :%v\n", indentation, replica.Status))
-	sb.WriteString(fmt.Sprintf("%vTotal            :%v GB\n", indentation, replica.Total/(1024*1024*1024)))
+	sb.WriteString(fmt.Sprintf("%vTotal            :%v\n", indentation, formatSize(replica.Total)))
 	sb.WriteString(fmt.Sprintf("%vDiskPath         :%v\n", indentation, replica.DiskPath))
 	sb.WriteString(fmt.Sprintf("%vAddr             :%v\n", indentation, replica.Addr))
-	sb.WriteString(fmt.Sprintf("%vUsed             :%v GB\n", indentation, replica.Used))
+	sb.WriteString(fmt.Sprintf("%vUsed             :%v\n", indentation, formatSize(replica.Used)))
 	sb.WriteString(fmt.Sprintf("%vIsLeader         :%v\n", indentation, replica.IsLeader))
 	sb.WriteString(fmt.Sprintf("%vFileCount        :%v\n", indentation, replica.FileCount))
 	sb.WriteString(fmt.Sprintf("%vHasLoadResponse  :%v\n", indentation, replica.HasLoadResponse))
@@ -313,13 +313,13 @@ func formatPeer(indentation string, peer proto.Peer) string {
 
 func formatDataNodeDetail(dn *proto.DataNodeInfo) string {
 	var sb = strings.Builder{}
-	sb.WriteString(fmt.Sprintf("  ID                  : %v GB\n", dn.ID))
+	sb.WriteString(fmt.Sprintf("  ID                  : %v\n", dn.ID))
 	sb.WriteString(fmt.Sprintf("  Address             : %v\n", dn.Addr))
 	sb.WriteString(fmt.Sprintf("  Carry               : %v\n", dn.Carry))
 	sb.WriteString(fmt.Sprintf("  Used ratio          : %v\n", dn.UsageRatio))
-	sb.WriteString(fmt.Sprintf("  Used                : %v\n", dn.Used))
-	sb.WriteString(fmt.Sprintf("  Available           : %v\n", dn.AvailableSpace))
-	sb.WriteString(fmt.Sprintf("  Total               : %v\n", dn.Total))
+	sb.WriteString(fmt.Sprintf("  Used                : %v\n", formatSize(dn.Used)))
+	sb.WriteString(fmt.Sprintf("  Available           : %v\n", formatSize(dn.AvailableSpace)))
+	sb.WriteString(fmt.Sprintf("  Total               : %v\n", formatSize(dn.Total)))
 	sb.WriteString(fmt.Sprintf("  Zone                : %v\n", dn.ZoneName))
 	sb.WriteString(fmt.Sprintf("  IsActive            : %v\n", formatNodeStatus(dn.IsActive)))
 	sb.WriteString(fmt.Sprintf("  Report time         : %v\n", dn.ReportTime))
@@ -331,13 +331,13 @@ func formatDataNodeDetail(dn *proto.DataNodeInfo) string {
 
 func formatMetaNodeDetail(mn *proto.MetaNodeInfo) string {
 	var sb = strings.Builder{}
-	sb.WriteString(fmt.Sprintf("  ID                  : %v GB\n", mn.ID))
+	sb.WriteString(fmt.Sprintf("  ID                  : %v\n", mn.ID))
 	sb.WriteString(fmt.Sprintf("  Address             : %v\n", mn.Addr))
 	sb.WriteString(fmt.Sprintf("  Carry               : %v\n", mn.Carry))
 	sb.WriteString(fmt.Sprintf("  Threshold           : %v\n", mn.Threshold))
 	sb.WriteString(fmt.Sprintf("  MaxMemAvailWeight   : %v\n", mn.MaxMemAvailWeight))
-	sb.WriteString(fmt.Sprintf("  Used                : %v\n", mn.Used))
-	sb.WriteString(fmt.Sprintf("  Total               : %v\n", mn.Total))
+	sb.WriteString(fmt.Sprintf("  Used                : %v\n", formatSize(mn.Used)))
+	sb.WriteString(fmt.Sprintf("  Total               : %v\n", formatSize(mn.Total)))
 	sb.WriteString(fmt.Sprintf("  Zone                : %v\n", mn.ZoneName))
 	sb.WriteString(fmt.Sprintf("  IsActive            : %v\n", formatNodeStatus(mn.IsActive)))
 	sb.WriteString(fmt.Sprintf("  Report time         : %v\n", mn.ReportTime))
