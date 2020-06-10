@@ -58,6 +58,7 @@ const (
 	DecommissionMetaNode           = "/metaNode/decommission"
 	GetMetaNode                    = "/metaNode/get"
 	AdminLoadMetaPartition         = "/metaPartition/load"
+	AdminResetMetaPartition        = "/metaPartition/reset"
 	AdminDecommissionMetaPartition = "/metaPartition/decommission"
 	AdminAddMetaReplica            = "/metaReplica/add"
 	AdminDeleteMetaReplica         = "/metaReplica/delete"

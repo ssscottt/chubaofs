@@ -37,6 +37,7 @@ func newMetaNodeCmd(client *master.MasterClient) *cobra.Command {
 	cmd.AddCommand(
 		newMetaNodeListCmd(client),
 		newMetaNodeInfoCmd(client),
+		newMetaNodeDecommissionCmd(client),
 	)
 	return cmd
 }
@@ -109,6 +110,36 @@ func newMetaNodeInfoCmd(client *master.MasterClient) *cobra.Command {
 			}
 			stdout("[Meta node info]\n")
 			stdout(formatMetaNodeDetail(metanodeInfo))
+
+		},
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) != 0 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return validMetaNodes(client, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+	}
+	return cmd
+}
+func newMetaNodeDecommissionCmd(client *master.MasterClient) *cobra.Command {
+	var cmd = &cobra.Command{
+		Use:   CliOpDecommission + " [NODE ADDRESS]",
+		Short: cmdMetaNodeDecommissionInfoShort,
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			var err error
+			var nodeAddr string
+			defer func() {
+				if err != nil {
+					errout("decommission meta node failed: %v\n", err)
+					os.Exit(1)
+				}
+			}()
+			nodeAddr = args[0]
+			if err = client.NodeAPI().MetaNodeDecommission(nodeAddr); err != nil {
+				return
+			}
+			stdout("Decommission meta node successfully\n")
 
 		},
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

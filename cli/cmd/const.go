@@ -30,6 +30,7 @@ const (
 	CliOpSetThreshold = "threshold"
 	CliOpCheck        = "check"
 	CliOpReset        = "reset"
+	CliOpReplicate    = "replicate"
 
 	//Shorthand format of operation name
 	CliOpDecommissionShortHand = "dec"

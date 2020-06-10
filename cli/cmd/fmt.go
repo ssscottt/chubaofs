@@ -142,13 +142,18 @@ func formatDataPartitionTableRow(view *proto.DataPartitionResponse) string {
 }
 
 var (
-	dataPartitionInfoTablePattern = "%-8v    %-8v    %-10v     %-18v    %-18v"
-	dataPartitionInfoTableHeader  = fmt.Sprintf(dataPartitionInfoTablePattern,
+	partitionInfoTablePattern = "%-8v    %-8v    %-10v     %-18v    %-18v"
+	partitionInfoTableHeader  = fmt.Sprintf(partitionInfoTablePattern,
 		"ID", "VOLUME", "REPLICAS", "STATUS", "MEMBERS")
 )
 
 func formatDataPartitionInfoRow(partition *proto.DataPartitionInfo) string {
-	return fmt.Sprintf(dataPartitionInfoTablePattern,
+	return fmt.Sprintf(partitionInfoTablePattern,
+		partition.PartitionID, partition.VolName, partition.ReplicaNum, formatDataPartitionStatus(partition.Status), strings.Join(partition.Hosts, ","))
+}
+
+func formatMetaPartitionInfoRow(partition *proto.MetaPartitionInfo) string {
+	return fmt.Sprintf(partitionInfoTablePattern,
 		partition.PartitionID, partition.VolName, partition.ReplicaNum, formatDataPartitionStatus(partition.Status), strings.Join(partition.Hosts, ","))
 }
 

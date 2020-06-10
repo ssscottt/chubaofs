@@ -501,7 +501,7 @@ func (m *Server) resetDataPartition(w http.ResponseWriter, r *http.Request) {
 		rstMsg      string
 		err         error
 	)
-	if partitionID, volName, err = parseRequestToGetDataPartition(r); err != nil {
+	if partitionID, volName, err = parseRequestToResetDataPartition(r); err != nil {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
@@ -938,6 +938,31 @@ func (m *Server) decommissionMetaPartition(w http.ResponseWriter, r *http.Reques
 	sendOkReply(w, r, newSuccessHTTPReply(msg))
 }
 
+func (m *Server) resetMetaPartition(w http.ResponseWriter, r *http.Request) {
+	var (
+		mp          *MetaPartition
+		partitionID uint64
+		rstMsg      string
+		err         error
+	)
+	if partitionID, err = parseRequestToReplicateMetaPartition(r); err != nil {
+		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
+		return
+	}
+
+	if mp, err = m.cluster.getMetaPartitionByID(partitionID); err != nil {
+		sendErrReply(w, r, newErrHTTPReply(proto.ErrMetaPartitionNotExists))
+		return
+	}
+
+	if err = m.cluster.resetMetaPartition(mp); err != nil {
+		sendErrReply(w, r, newErrHTTPReply(err))
+		return
+	}
+	rstMsg = fmt.Sprintf(proto.AdminResetDataPartition+" dataPartitionID :%v successfully", partitionID)
+	sendOkReply(w, r, newSuccessHTTPReply(rstMsg))
+}
+
 func (m *Server) loadMetaPartition(w http.ResponseWriter, r *http.Request) {
 	var (
 		msg         string
@@ -1303,6 +1328,10 @@ func parseRequestToGetDataPartition(r *http.Request) (ID uint64, volName string,
 	return
 }
 
+func parseRequestToResetDataPartition(r *http.Request) (ID uint64, volName string, err error) {
+	return parseRequestToGetDataPartition(r)
+}
+
 func parseRequestToLoadDataPartition(r *http.Request) (ID uint64, err error) {
 	if err = r.ParseForm(); err != nil {
 		return
@@ -1396,6 +1425,10 @@ func parseRequestToLoadMetaPartition(r *http.Request) (partitionID uint64, err e
 
 func parseRequestToDecommissionMetaPartition(r *http.Request) (partitionID uint64, nodeAddr string, err error) {
 	return extractMetaPartitionIDAndAddr(r)
+}
+
+func parseRequestToReplicateMetaPartition(r *http.Request) (partitionID uint64, err error) {
+	return extractMetaPartitionID(r)
 }
 
 func parseAndExtractStatus(r *http.Request) (status bool, err error) {

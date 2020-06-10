@@ -73,6 +73,15 @@ func (api *AdminAPI) ResetDataPartition(volName string, partitionID uint64) (err
 	}
 	return
 }
+func (api *AdminAPI) ResetMetaPartition(volName string, partitionID uint64) (err error) {
+	var request = newAPIRequest(http.MethodGet, proto.AdminResetMetaPartition)
+	request.addParam("id", strconv.Itoa(int(partitionID)))
+	request.addParam("name", volName)
+	if _, err = api.mc.serveRequest(request); err != nil {
+		return
+	}
+	return
+}
 func (api *AdminAPI) LoadDataPartition(volName string, partitionID uint64) (err error) {
 	var request = newAPIRequest(http.MethodGet, proto.AdminLoadDataPartition)
 	request.addParam("id", strconv.Itoa(int(partitionID)))
@@ -126,6 +135,16 @@ func (api *AdminAPI) DeleteDataReplica(dataPartitionID uint64, nodeAddr string) 
 func (api *AdminAPI) AddDataReplica(dataPartitionID uint64, nodeAddr string) (err error) {
 	var request = newAPIRequest(http.MethodGet, proto.AdminAddDataReplica)
 	request.addParam("id", strconv.FormatUint(dataPartitionID, 10))
+	request.addParam("addr", nodeAddr)
+	if _, err = api.mc.serveRequest(request); err != nil {
+		return
+	}
+	return
+}
+
+func (api *AdminAPI) AddMetaReplica(metaPartitionID uint64, nodeAddr string) (err error) {
+	var request = newAPIRequest(http.MethodGet, proto.AdminAddMetaReplica)
+	request.addParam("id", strconv.FormatUint(metaPartitionID, 10))
 	request.addParam("addr", nodeAddr)
 	if _, err = api.mc.serveRequest(request); err != nil {
 		return

@@ -1166,6 +1166,17 @@ func (c *Cluster) forceRemoveDataReplica(dp *DataPartition, addrs []string) (err
 	for _, addr := range addrs {
 		dp.removeReplicaByAddr(addr)
 		dp.checkAndRemoveMissReplica(addr)
+		var dataNode *DataNode
+		if dataNode, err = c.dataNode(addr); err != nil {
+			return
+		}
+
+		for _, pid := range dataNode.PersistenceDataPartitions {
+			if pid == dp.PartitionID {
+				continue
+			}
+		}
+
 	}
 	if err = dp.update("forceRemoveDataReplica", dp.VolName, newPeers, newHosts, c); err != nil {
 		return
