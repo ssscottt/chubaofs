@@ -245,7 +245,7 @@ func newMetaPartitionReplicateCmd(client *master.MasterClient) *cobra.Command {
 			if len(args) != 0 {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
-			return validDataNodes(client, toComplete), cobra.ShellCompDirectiveNoFileComp
+			return validMetaNodes(client, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 	}
 	return cmd
