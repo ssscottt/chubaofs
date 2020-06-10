@@ -1149,7 +1149,7 @@ func (c *Cluster) forceRemoveDataReplica(dp *DataPartition, addrs []string) (err
 			newPeers = append(newPeers, peer)
 		}
 	}
-	for _, host := range dp.Hosts {
+	for _, host := range newHosts {
 		var dataNode *DataNode
 		if dataNode, err = c.dataNode(host); err != nil {
 			return
