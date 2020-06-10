@@ -154,33 +154,34 @@ func formatDataPartitionInfoRow(partition *proto.DataPartitionInfo) string {
 
 func formatDataPartitionInfo(partition *proto.DataPartitionInfo) string {
 	var sb = strings.Builder{}
-	sb.WriteString(fmt.Sprintf("volume name   :%v\n", partition.VolName))
-	sb.WriteString(fmt.Sprintf("volume ID     :%v\n", partition.VolID))
-	sb.WriteString(fmt.Sprintf("PartitionID   :%v\n", partition.PartitionID))
-	sb.WriteString(fmt.Sprintf("Status        :%v\n", partition.Status))
-	sb.WriteString(fmt.Sprintf("LastLoadedTime:%v\n", formatTime(partition.LastLoadedTime)))
-	sb.WriteString(fmt.Sprintf("Replicas      :\n"))
+	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("volume name   : %v\n", partition.VolName))
+	sb.WriteString(fmt.Sprintf("volume ID     : %v\n", partition.VolID))
+	sb.WriteString(fmt.Sprintf("PartitionID   : %v\n", partition.PartitionID))
+	sb.WriteString(fmt.Sprintf("Status        : %v\n", partition.Status))
+	sb.WriteString(fmt.Sprintf("LastLoadedTime: %v\n", formatTime(partition.LastLoadedTime)))
+	sb.WriteString(fmt.Sprintf("Replicas : \n"))
 	for _, replica := range partition.Replicas {
 		sb.WriteString(formatReplica("  ", replica))
 		sb.WriteString("\n")
 	}
-	sb.WriteString(fmt.Sprintf("Peers:\n"))
+	sb.WriteString(fmt.Sprintf("Peers :\n"))
 	for _, peer := range partition.Peers {
 		sb.WriteString(formatPeer("  ", peer))
 	}
-	sb.WriteString(fmt.Sprintf("Hosts         :\n"))
+	sb.WriteString(fmt.Sprintf("Hosts :\n"))
 	for _, host := range partition.Hosts {
 		sb.WriteString(fmt.Sprintf("  [%v]\n", host))
 	}
-	sb.WriteString(fmt.Sprintf("Zones         :\n"))
+	sb.WriteString(fmt.Sprintf("Zones :\n"))
 	for _, zone := range partition.Zones {
 		sb.WriteString(fmt.Sprintf("  [%v]\n", zone))
 	}
-	sb.WriteString(fmt.Sprintf("MissingNodes  :\n"))
+	sb.WriteString(fmt.Sprintf("MissingNodes :\n"))
 	for partitionHost, id := range partition.MissingNodes {
 		sb.WriteString(fmt.Sprintf("  [%v, %v]\n", partitionHost, id))
 	}
-	sb.WriteString(fmt.Sprintf("FilesWithMissingReplica: \n"))
+	sb.WriteString(fmt.Sprintf("FilesWithMissingReplica : \n"))
 	for file, id := range partition.FilesWithMissingReplica {
 		sb.WriteString(fmt.Sprintf("  [%v, %v]\n", file, id))
 	}
@@ -297,22 +298,22 @@ func formatTime(timeUnix int64) string {
 
 func formatReplica(indentation string, replica *proto.DataReplica) string {
 	var sb = strings.Builder{}
-	sb.WriteString(fmt.Sprintf("%v- Addr           :%v\n", indentation, replica.Addr))
-	sb.WriteString(fmt.Sprintf("%v  Status         :%v\n", indentation, replica.Status))
-	sb.WriteString(fmt.Sprintf("%v  Total          :%v\n", indentation, formatSize(replica.Total)))
-	sb.WriteString(fmt.Sprintf("%v  DiskPath       :%v\n", indentation, replica.DiskPath))
-	sb.WriteString(fmt.Sprintf("%v  Used           :%v\n", indentation, formatSize(replica.Used)))
-	sb.WriteString(fmt.Sprintf("%v  IsLeader       :%v\n", indentation, replica.IsLeader))
-	sb.WriteString(fmt.Sprintf("%v  FileCount      :%v\n", indentation, replica.FileCount))
-	sb.WriteString(fmt.Sprintf("%v  HasLoadResponse:%v\n", indentation, replica.HasLoadResponse))
-	sb.WriteString(fmt.Sprintf("%v  NeedsToCompare :%v\n", indentation, replica.NeedsToCompare))
-	sb.WriteString(fmt.Sprintf("%v  ReportTime     :%v\n", indentation, time.Unix(replica.ReportTime, 0).Format("2006-01-02 15:04:05")))
+	sb.WriteString(fmt.Sprintf("%v- Addr           : %v\n", indentation, replica.Addr))
+	sb.WriteString(fmt.Sprintf("%v  Status         : %v\n", indentation, replica.Status))
+	sb.WriteString(fmt.Sprintf("%v  Total          : %v\n", indentation, formatSize(replica.Total)))
+	sb.WriteString(fmt.Sprintf("%v  DiskPath       : %v\n", indentation, replica.DiskPath))
+	sb.WriteString(fmt.Sprintf("%v  Used           : %v\n", indentation, formatSize(replica.Used)))
+	sb.WriteString(fmt.Sprintf("%v  IsLeader       : %v\n", indentation, replica.IsLeader))
+	sb.WriteString(fmt.Sprintf("%v  FileCount      : %v\n", indentation, replica.FileCount))
+	sb.WriteString(fmt.Sprintf("%v  HasLoadResponse: %v\n", indentation, replica.HasLoadResponse))
+	sb.WriteString(fmt.Sprintf("%v  NeedsToCompare : %v\n", indentation, replica.NeedsToCompare))
+	sb.WriteString(fmt.Sprintf("%v  ReportTime     : %v\n", indentation, time.Unix(replica.ReportTime, 0).Format("2006-01-02 15:04:05")))
 	return sb.String()
 }
 func formatPeer(indentation string, peer proto.Peer) string {
 	var sb = strings.Builder{}
-	sb.WriteString(fmt.Sprintf("%v- ID:   %v\n", indentation, peer.ID))
-	sb.WriteString(fmt.Sprintf("%v  Peer: %v\n", indentation, peer.Addr))
+	sb.WriteString(fmt.Sprintf("%v- ID  :%v\n", indentation, peer.ID))
+	sb.WriteString(fmt.Sprintf("%v  Peer:%v\n", indentation, peer.Addr))
 	return sb.String()
 }
 
