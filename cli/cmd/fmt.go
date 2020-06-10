@@ -162,18 +162,25 @@ func formatDataPartitionInfo(partition *proto.DataPartitionInfo) string {
 	sb.WriteString(fmt.Sprintf("Replicas      :\n"))
 	for _, replica := range partition.Replicas {
 		sb.WriteString(formatReplica("  ", replica))
+		sb.WriteString("\n")
 	}
 	sb.WriteString(fmt.Sprintf("Peers:\n"))
 	for _, peer := range partition.Peers {
 		sb.WriteString(formatPeer("  ", peer))
 	}
-	sb.WriteString(fmt.Sprintf("Hosts         :%v\n", partition.Hosts))
-	sb.WriteString(fmt.Sprintf("Zones			:%v\n", partition.Zones))
-	sb.WriteString(fmt.Sprintf("MissingNodes	:\n"))
+	sb.WriteString(fmt.Sprintf("Hosts         :\n"))
+	for _, host := range partition.Hosts {
+		sb.WriteString(fmt.Sprintf("  [%v]\n", host))
+	}
+	sb.WriteString(fmt.Sprintf("Zones         :\n"))
+	for _, zone := range partition.Zones {
+		sb.WriteString(fmt.Sprintf("  [%v]\n", zone))
+	}
+	sb.WriteString(fmt.Sprintf("MissingNodes  :\n"))
 	for partitionHost, id := range partition.MissingNodes {
 		sb.WriteString(fmt.Sprintf("  [%v, %v]\n", partitionHost, id))
 	}
-	sb.WriteString(fmt.Sprintf("  FilesWithMissingReplica: \n"))
+	sb.WriteString(fmt.Sprintf("FilesWithMissingReplica: \n"))
 	for file, id := range partition.FilesWithMissingReplica {
 		sb.WriteString(fmt.Sprintf("  [%v, %v]\n", file, id))
 	}
@@ -290,16 +297,16 @@ func formatTime(timeUnix int64) string {
 
 func formatReplica(indentation string, replica *proto.DataReplica) string {
 	var sb = strings.Builder{}
-	sb.WriteString(fmt.Sprintf("%v- Addr             :%v\n", indentation, replica.Addr))
-	sb.WriteString(fmt.Sprintf("%v  Status           :%v\n", indentation, replica.Status))
-	sb.WriteString(fmt.Sprintf("%v  Total            :%v\n", indentation, formatSize(replica.Total)))
-	sb.WriteString(fmt.Sprintf("%v  DiskPath         :%v\n", indentation, replica.DiskPath))
-	sb.WriteString(fmt.Sprintf("%v  Used             :%v\n", indentation, formatSize(replica.Used)))
-	sb.WriteString(fmt.Sprintf("%v  IsLeader         :%v\n", indentation, replica.IsLeader))
-	sb.WriteString(fmt.Sprintf("%v  FileCount        :%v\n", indentation, replica.FileCount))
-	sb.WriteString(fmt.Sprintf("%v  HasLoadResponse  :%v\n", indentation, replica.HasLoadResponse))
-	sb.WriteString(fmt.Sprintf("%v  NeedsToCompare   :%v\n", indentation, replica.NeedsToCompare))
-	sb.WriteString(fmt.Sprintf("%v  ReportTime       :%v\n", indentation, time.Unix(replica.ReportTime, 0).Format("2006-01-02 15:04:05")))
+	sb.WriteString(fmt.Sprintf("%v- Addr           :%v\n", indentation, replica.Addr))
+	sb.WriteString(fmt.Sprintf("%v  Status         :%v\n", indentation, replica.Status))
+	sb.WriteString(fmt.Sprintf("%v  Total          :%v\n", indentation, formatSize(replica.Total)))
+	sb.WriteString(fmt.Sprintf("%v  DiskPath       :%v\n", indentation, replica.DiskPath))
+	sb.WriteString(fmt.Sprintf("%v  Used           :%v\n", indentation, formatSize(replica.Used)))
+	sb.WriteString(fmt.Sprintf("%v  IsLeader       :%v\n", indentation, replica.IsLeader))
+	sb.WriteString(fmt.Sprintf("%v  FileCount      :%v\n", indentation, replica.FileCount))
+	sb.WriteString(fmt.Sprintf("%v  HasLoadResponse:%v\n", indentation, replica.HasLoadResponse))
+	sb.WriteString(fmt.Sprintf("%v  NeedsToCompare :%v\n", indentation, replica.NeedsToCompare))
+	sb.WriteString(fmt.Sprintf("%v  ReportTime     :%v\n", indentation, time.Unix(replica.ReportTime, 0).Format("2006-01-02 15:04:05")))
 	return sb.String()
 }
 func formatPeer(indentation string, peer proto.Peer) string {
@@ -333,7 +340,7 @@ func formatMetaNodeDetail(mn *proto.MetaNodeInfo) string {
 	sb.WriteString(fmt.Sprintf("  Address             : %v\n", mn.Addr))
 	sb.WriteString(fmt.Sprintf("  Carry               : %v\n", mn.Carry))
 	sb.WriteString(fmt.Sprintf("  Threshold           : %v\n", mn.Threshold))
-	sb.WriteString(fmt.Sprintf("  MaxMemAvailWeight   : %v\n", mn.MaxMemAvailWeight))
+	sb.WriteString(fmt.Sprintf("  MaxMemAvailWeight   : %v\n", formatSize(mn.MaxMemAvailWeight)))
 	sb.WriteString(fmt.Sprintf("  Used                : %v\n", formatSize(mn.Used)))
 	sb.WriteString(fmt.Sprintf("  Total               : %v\n", formatSize(mn.Total)))
 	sb.WriteString(fmt.Sprintf("  Zone                : %v\n", mn.ZoneName))
