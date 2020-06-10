@@ -1129,24 +1129,24 @@ func (c *Cluster) forceRemoveDataReplica(dp *DataPartition, addrs []string) (err
 	// Only after reset peers succeed in remote datanode, the meta data can be updated
 	newHosts := make([]string, 0, len(dp.Hosts)-len(addrs))
 	newPeers := make([]proto.Peer, 0, len(dp.Peers)-len(addrs))
-	for _, addr := range addrs {
+	for _, host := range dp.Hosts {
+		for _, addr := range addrs {
+			if host == addr {
+				continue
+			}
+		}
+		newHosts = append(newHosts, host)
+	}
+	for _, host := range newHosts {
 		var dataNode *DataNode
-		dataNode, err = c.dataNode(addr)
+		dataNode, err = c.dataNode(host)
 		if err != nil {
 			return
 		}
-		removePeer := proto.Peer{ID: dataNode.ID, Addr: addr}
-		for _, host := range dp.Hosts {
-			if host == removePeer.Addr {
-				continue
-			}
-			newHosts = append(newHosts, host)
-		}
 		for _, peer := range dp.Peers {
-			if peer.ID == removePeer.ID && peer.Addr == removePeer.Addr {
-				continue
+			if peer.ID == dataNode.ID && peer.Addr == host {
+				newPeers = append(newPeers, peer)
 			}
-			newPeers = append(newPeers, peer)
 		}
 	}
 	log.LogInfof("action[forceRemoveDataReplica],new peers[%v], old peers[%v], err[%v]", newPeers, dp.Peers, err)
