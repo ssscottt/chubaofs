@@ -1130,10 +1130,14 @@ func (c *Cluster) forceRemoveDataReplica(dp *DataPartition, addrs []string) (err
 	newHosts := make([]string, 0, len(dp.Hosts)-len(addrs))
 	newPeers := make([]proto.Peer, 0, len(dp.Peers)-len(addrs))
 	for _, host := range dp.Hosts {
+		flag := false
 		for _, addr := range addrs {
 			if host == addr {
-				continue
+				flag = true
 			}
+		}
+		if flag {
+			continue
 		}
 		newHosts = append(newHosts, host)
 	}

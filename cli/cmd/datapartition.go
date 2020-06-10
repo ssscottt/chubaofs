@@ -90,18 +90,19 @@ func newListCorruptDataPartitionCmd(client *master.MasterClient) *cobra.Command 
 				return
 			}
 			stdout("[Inactive Data nodes]:\n")
-			stdout("%v\n", formatNodeViewTableHeader())
-
-			for _, node := range view.DataNodes {
-				if !strings.Contains(formatNodeStatus(node.Status), "Inactive") {
-					continue
+			if len(view.DataNodes) > 0 {
+				stdout("%v\n", formatNodeViewTableHeader())
+				for _, node := range view.DataNodes {
+					if !strings.Contains(formatNodeStatus(node.Status), "Inactive") {
+						continue
+					}
+					inactiveNodes = append(inactiveNodes, node.Addr)
+					stdout("%v\n", formatNodeView(&node, true))
 				}
-				inactiveNodes = append(inactiveNodes, node.Addr)
-				stdout("%v\n", formatNodeView(&node, true))
 			}
 			stdout("\n")
 			stdout("[Corrupt data partitions](no leader):\n")
-			stdout("%v\n", dataPartitionInfoTableHeader)
+
 			for _, addr := range inactiveNodes {
 				var nodeInfo *proto.DataNodeInfo
 				if nodeInfo, err = client.NodeAPI().GetDataNode(addr); err != nil {
@@ -112,18 +113,21 @@ func newListCorruptDataPartitionCmd(client *master.MasterClient) *cobra.Command 
 					partitionMap[partition] = partitionMap[partition] + 1
 				}
 			}
-			for partitionID, badNum := range partitionMap {
-				var partition *proto.DataPartitionInfo
-				if partition, err = client.AdminAPI().GetDataPartition("", partitionID); err != nil {
-					stdout("partition not found, err:[%v]", err)
-					return
-				}
-				if badNum > partition.ReplicaNum/2 {
-					stdout("%v\n", formatDataPartitionInfoRow(partition))
+			if len(partitionMap) > 0 {
+				stdout("%v\n", dataPartitionInfoTableHeader)
+				for partitionID, badNum := range partitionMap {
+					var partition *proto.DataPartitionInfo
+					if partition, err = client.AdminAPI().GetDataPartition("", partitionID); err != nil {
+						stdout("partition not found, err:[%v]", err)
+						return
+					}
+					if badNum > partition.ReplicaNum/2 {
+						stdout("%v\n", formatDataPartitionInfoRow(partition))
+					}
 				}
 			}
+			stdout("\n")
 			stdout("%v\n", "[Partition not full]:")
-			stdout("%v\n", "using `add-replica` command to full-fill the partition ")
 			for _, vol := range view.VolStatInfo {
 				var dps *proto.DataPartitionsView
 				if dps, err = client.ClientAPI().GetDataPartitions(vol.Name); err != nil {
