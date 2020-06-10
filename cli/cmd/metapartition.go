@@ -67,7 +67,7 @@ func newMetaPartitionGetCmd(client *master.MasterClient) *cobra.Command {
 			if partition, err = client.ClientAPI().GetMetaPartition(partitionID); err != nil {
 				return
 			}
-			stdout("%v\n ", partition)
+			stdout(formatMetaPartitionInfo(partition))
 		},
 	}
 	return cmd

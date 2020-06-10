@@ -167,7 +167,7 @@ func formatDataPartitionInfo(partition *proto.DataPartitionInfo) string {
 	sb.WriteString(fmt.Sprintf("LastLoadedTime: %v\n", formatTime(partition.LastLoadedTime)))
 	sb.WriteString(fmt.Sprintf("Replicas : \n"))
 	for _, replica := range partition.Replicas {
-		sb.WriteString(formatReplica("  ", replica))
+		sb.WriteString(formatDataReplica("  ", replica))
 		sb.WriteString("\n")
 	}
 	sb.WriteString(fmt.Sprintf("Peers :\n"))
@@ -189,6 +189,40 @@ func formatDataPartitionInfo(partition *proto.DataPartitionInfo) string {
 	sb.WriteString(fmt.Sprintf("FilesWithMissingReplica : \n"))
 	for file, id := range partition.FilesWithMissingReplica {
 		sb.WriteString(fmt.Sprintf("  [%v, %v]\n", file, id))
+	}
+	return sb.String()
+}
+
+func formatMetaPartitionInfo(partition *proto.MetaPartitionInfo) string {
+	var sb = strings.Builder{}
+	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("volume name   : %v\n", partition.VolName))
+	sb.WriteString(fmt.Sprintf("PartitionID   : %v\n", partition.PartitionID))
+	sb.WriteString(fmt.Sprintf("Status        : %v\n", formatMetaPartitionStatus(partition.Status)))
+	sb.WriteString(fmt.Sprintf("Recovering    : %v\n", formatIsRecover(partition.IsRecover)))
+	sb.WriteString(fmt.Sprintf("Start         : %v\n", partition.Start))
+	sb.WriteString(fmt.Sprintf("End           : %v\n", partition.End))
+	sb.WriteString(fmt.Sprintf("MaxInodeID    : %v\n", partition.MaxInodeID))
+	sb.WriteString(fmt.Sprintf("Replicas : \n"))
+	for _, replica := range partition.Replicas {
+		sb.WriteString(formatMetaReplica("  ", replica))
+		sb.WriteString("\n")
+	}
+	sb.WriteString(fmt.Sprintf("Peers :\n"))
+	for _, peer := range partition.Peers {
+		sb.WriteString(formatPeer("  ", peer))
+	}
+	sb.WriteString(fmt.Sprintf("Hosts :\n"))
+	for _, host := range partition.Hosts {
+		sb.WriteString(fmt.Sprintf("  [%v]\n", host))
+	}
+	sb.WriteString(fmt.Sprintf("Zones :\n"))
+	for _, zone := range partition.Zones {
+		sb.WriteString(fmt.Sprintf("  [%v]\n", zone))
+	}
+	sb.WriteString(fmt.Sprintf("MissingNodes :\n"))
+	for partitionHost, id := range partition.MissNodes {
+		sb.WriteString(fmt.Sprintf("  [%v, %v]\n", partitionHost, id))
 	}
 	return sb.String()
 }
@@ -232,6 +266,15 @@ func formatDataPartitionStatus(status int8) string {
 		return "Unavailable"
 	default:
 		return "Unknown"
+	}
+}
+
+func formatIsRecover(isRecover bool) string {
+	switch isRecover {
+	case true:
+		return "Yes"
+	default:
+		return "No"
 	}
 }
 
@@ -301,7 +344,7 @@ func formatTime(timeUnix int64) string {
 	return time.Unix(timeUnix, 0).Format("2006-01-02 15:04:05")
 }
 
-func formatReplica(indentation string, replica *proto.DataReplica) string {
+func formatDataReplica(indentation string, replica *proto.DataReplica) string {
 	var sb = strings.Builder{}
 	sb.WriteString(fmt.Sprintf("%v- Addr           : %v\n", indentation, replica.Addr))
 	sb.WriteString(fmt.Sprintf("%v  Status         : %v\n", indentation, replica.Status))
@@ -315,6 +358,16 @@ func formatReplica(indentation string, replica *proto.DataReplica) string {
 	sb.WriteString(fmt.Sprintf("%v  ReportTime     : %v\n", indentation, time.Unix(replica.ReportTime, 0).Format("2006-01-02 15:04:05")))
 	return sb.String()
 }
+
+func formatMetaReplica(indentation string, replica *proto.MetaReplicaInfo) string {
+	var sb = strings.Builder{}
+	sb.WriteString(fmt.Sprintf("%v- Addr           : %v\n", indentation, replica.Addr))
+	sb.WriteString(fmt.Sprintf("%v  Status         : %v\n", indentation, replica.Status))
+	sb.WriteString(fmt.Sprintf("%v  IsLeader       : %v\n", indentation, replica.IsLeader))
+	sb.WriteString(fmt.Sprintf("%v  ReportTime     : %v\n", indentation, time.Unix(replica.ReportTime, 0).Format("2006-01-02 15:04:05")))
+	return sb.String()
+}
+
 func formatPeer(indentation string, peer proto.Peer) string {
 	var sb = strings.Builder{}
 	sb.WriteString(fmt.Sprintf("%v- ID  :%v\n", indentation, peer.ID))
