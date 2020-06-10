@@ -185,8 +185,10 @@ func newResetMetaPartitionCmd(client *master.MasterClient) *cobra.Command {
 				}
 			}
 			if inactiveNum > partition.ReplicaNum/2 {
-				//client.AdminAPI().ResetMetaPartition(partition.VolName, partitionID)
-				stdout("Not supported\n")
+				if err = client.AdminAPI().ResetMetaPartition(partition.VolName, partitionID); err != nil {
+					stdout("%v\n", err)
+					return
+				}
 			} else {
 				stdout("%v\n", "can not reset, active replicas are more than half of all")
 			}
