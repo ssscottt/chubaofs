@@ -556,7 +556,7 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		authKey      string
 		err          error
 		msg          string
-		capacity     int
+		capacity     uint64
 		replicaNum   int
 		followerRead bool
 		authenticate bool
@@ -564,7 +564,15 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		zoneName     string
 		vol          *Vol
 	)
-	if name, authKey, zoneName, capacity, replicaNum, enableToken, err = parseRequestToUpdateVol(r); err != nil {
+	if name, authKey, err = parseRequestToUpdateVol(r); err != nil {
+		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
+		return
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeVolNotExists, Msg: err.Error()})
+		return
+	}
+	if zoneName, capacity, replicaNum, enableToken, err = parseDefaultInfoToUpdateVol(r, vol); err != nil {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
@@ -573,15 +581,12 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
-	if vol, err = m.cluster.getVol(name); err != nil {
-		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeVolNotExists, Msg: err.Error()})
-		return
-	}
+
 	if followerRead, authenticate, err = parseBoolFieldToUpdateVol(r, vol); err != nil {
 		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
 		return
 	}
-	if err = m.cluster.updateVol(name, authKey, zoneName, uint64(capacity), vol.dpReplicaNum, followerRead, authenticate, enableToken); err != nil {
+	if err = m.cluster.updateVol(name, authKey, zoneName, capacity, vol.dpReplicaNum, followerRead, authenticate, enableToken); err != nil {
 		sendErrReply(w, r, newErrHTTPReply(err))
 		return
 	}
@@ -1201,7 +1206,7 @@ func parseRequestToDeleteVol(r *http.Request) (name, authKey string, err error) 
 
 }
 
-func parseRequestToUpdateVol(r *http.Request) (name, authKey, zoneName string, capacity, replicaNum int, enableToken bool, err error) {
+func parseRequestToUpdateVol(r *http.Request) (name, authKey string, err error) {
 	if err = r.ParseForm(); err != nil {
 		return
 	}
@@ -1211,23 +1216,46 @@ func parseRequestToUpdateVol(r *http.Request) (name, authKey, zoneName string, c
 	if authKey, err = extractAuthKey(r); err != nil {
 		return
 	}
+	return
+}
+
+func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, capacity uint64, replicaNum int, enableToken bool, err error) {
+	if err = r.ParseForm(); err != nil {
+		return
+	}
 	zoneName = r.FormValue(zoneNameKey)
+	if zoneName == "" {
+		zoneName = vol.zoneName
+	}
 	if capacityStr := r.FormValue(volCapacityKey); capacityStr != "" {
-		if capacity, err = strconv.Atoi(capacityStr); err != nil {
+		var capacityInt int
+		if capacityInt, err = strconv.Atoi(capacityStr); err != nil {
 			err = unmatchedKey(volCapacityKey)
 			return
 		}
+		capacity = uint64(capacityInt)
 	} else {
-		err = keyNotFound(volCapacityKey)
-		return
+		capacity = vol.Capacity
 	}
 	if replicaNumStr := r.FormValue(replicaNumKey); replicaNumStr != "" {
 		if replicaNum, err = strconv.Atoi(replicaNumStr); err != nil {
 			err = unmatchedKey(replicaNumKey)
 			return
 		}
+	} else {
+		replicaNum = int(vol.dpReplicaNum)
 	}
-	enableToken = extractEnableToken(r)
+	enableTokenStr := r.FormValue(enableTokenKey)
+	if enableTokenStr == "" {
+		enableToken = vol.enableToken
+		return
+	}else {
+		enableToken, err = strconv.ParseBool(enableTokenStr)
+		if err != nil {
+			err = unmatchedKey(enableTokenKey)
+		}
+		enableToken = vol.enableToken
+	}
 	return
 }
 
