@@ -593,6 +593,31 @@ func (m *Server) updateVol(w http.ResponseWriter, r *http.Request) {
 	msg = fmt.Sprintf("update vol[%v] successfully\n", name)
 	sendOkReply(w, r, newSuccessHTTPReply(msg))
 }
+func (m *Server) volSetCapacity(w http.ResponseWriter, r *http.Request) {
+	var (
+		name         string
+		authKey      string
+		err          error
+		msg          string
+		capacity     int
+		vol          *Vol
+	)
+	if name, authKey, capacity, err = parseRequestToSetVolCapacity(r); err != nil {
+		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
+		return
+	}
+	if vol, err = m.cluster.getVol(name); err != nil {
+		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeVolNotExists, Msg: err.Error()})
+		return
+	}
+
+	if err = m.cluster.updateVol(name, authKey, vol.zoneName, uint64(capacity), vol.dpReplicaNum, vol.FollowerRead, vol.authenticate, vol.enableToken); err != nil {
+		sendErrReply(w, r, newErrHTTPReply(err))
+		return
+	}
+	msg = fmt.Sprintf("update vol[%v] successfully\n", name)
+	sendOkReply(w, r, newSuccessHTTPReply(msg))
+}
 
 func (m *Server) createVol(w http.ResponseWriter, r *http.Request) {
 	var (
@@ -1223,8 +1248,7 @@ func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, ca
 	if err = r.ParseForm(); err != nil {
 		return
 	}
-	zoneName = r.FormValue(zoneNameKey)
-	if zoneName == "" {
+	if zoneName = r.FormValue(zoneNameKey); zoneName == "" {
 		zoneName = vol.zoneName
 	}
 	if capacityStr := r.FormValue(volCapacityKey); capacityStr != "" {
@@ -1245,15 +1269,12 @@ func parseDefaultInfoToUpdateVol(r *http.Request, vol *Vol) (zoneName string, ca
 	} else {
 		replicaNum = int(vol.dpReplicaNum)
 	}
-	enableTokenStr := r.FormValue(enableTokenKey)
-	if enableTokenStr == "" {
-		enableToken = vol.enableToken
-		return
-	}else {
-		enableToken, err = strconv.ParseBool(enableTokenStr)
-		if err != nil {
+	if enableTokenStr := r.FormValue(enableTokenKey); enableTokenStr != "" {
+		if enableToken, err = strconv.ParseBool(enableTokenStr); err != nil {
 			err = unmatchedKey(enableTokenKey)
+			return
 		}
+	}else {
 		enableToken = vol.enableToken
 	}
 	return
@@ -1275,6 +1296,26 @@ func parseBoolFieldToUpdateVol(r *http.Request, vol *Vol) (followerRead, authent
 		}
 	} else {
 		authenticate = vol.authenticate
+	}
+	return
+}
+
+func parseRequestToSetVolCapacity(r *http.Request) (name, authKey string, capacity int, err error) {
+	if err = r.ParseForm(); err != nil {
+		return
+	}
+	if name, err = extractName(r); err != nil {
+		return
+	}
+	if authKey, err = extractAuthKey(r); err != nil {
+		return
+	}
+	if capacityStr := r.FormValue(volCapacityKey); capacityStr == "" {
+		err = keyNotFound(volCapacityKey)
+		return
+	} else if capacity, err = strconv.Atoi(capacityStr); err != nil {
+		err = unmatchedKey(volCapacityKey)
+		return
 	}
 	return
 }
@@ -1775,7 +1816,7 @@ func volStat(vol *Vol) (stat *proto.VolStatInfo) {
 	stat = new(proto.VolStatInfo)
 	stat.Name = vol.Name
 	stat.TotalSize = vol.Capacity * util.GB
-	stat.UsedSize = vol.totalUsedSpace()
+	stat.UsedSize = vol.totalUsedSpaceByMetaReport()
 	if stat.UsedSize > stat.TotalSize {
 		stat.UsedSize = stat.TotalSize
 	}

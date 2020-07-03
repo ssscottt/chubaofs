@@ -153,8 +153,9 @@ const (
 
 const (
 	// interval of persisting in-memory data
-	intervalToPersistData = time.Minute * 5
-	intervalToSyncCursor  = time.Minute * 1
+	intervalToPersistData    = time.Minute * 5
+	intervalToCalculateSize  = time.Minute * 1
+	intervalToSyncCursor     = time.Minute * 1
 )
 
 const (

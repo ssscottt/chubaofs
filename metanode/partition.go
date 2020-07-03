@@ -119,6 +119,7 @@ type OpInode interface {
 	GetInodeTree() *BTree
 	DeleteInode(req *proto.DeleteInodeRequest, p *Packet) (err error)
 	DeleteInodeBatch(req *proto.DeleteInodeBatchRequest, p *Packet) (err error)
+	SumInodeSize() uint64
 }
 
 type OpExtend interface {
@@ -617,6 +618,7 @@ func (mp *metaPartition) ResponseLoadMetaPartition(p *Packet) (err error) {
 	resp.InodeCount = uint64(mp.getInodeTree().Len())
 	resp.DentryCount = uint64(mp.dentryTree.Len())
 	resp.ApplyID = mp.applyID
+	resp.Size = mp.size
 	if err != nil {
 		err = errors.Trace(err,
 			"[ResponseLoadMetaPartition] check snapshot")
@@ -655,4 +657,9 @@ func (mp *metaPartition) Reset() (err error) {
 	}
 
 	return
+}
+
+// GetCursor returns the cursor stored in the config.
+func (mp *metaPartition) GetInodesSize() uint64 {
+	return mp.size
 }

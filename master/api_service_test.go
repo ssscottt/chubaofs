@@ -321,16 +321,41 @@ func TestUpdateVol(t *testing.T) {
 		t.Errorf("expect FollowerRead is false, but is %v", vol.FollowerRead)
 		return
 	}
+	if vol.enableToken != false {
+		t.Errorf("expect enableToken is false, but is %v", vol.enableToken)
+		return
+	}
 
-	reqURL = fmt.Sprintf("%v%v?name=%v&capacity=%v&authKey=%v&followerRead=true",
-		hostAddr, proto.AdminUpdateVol, commonVol.Name, capacity, buildAuthKey("cfs"))
+	reqURL = fmt.Sprintf("%v%v?name=%v&capacity=%v&authKey=%v&followerRead=true&enableToken=true&zoneName=%v",
+		hostAddr, proto.AdminUpdateVol, commonVol.Name, capacity, buildAuthKey("cfs"), commonVol.zoneName)
 	process(reqURL, t)
 	if vol.FollowerRead != true {
 		t.Errorf("expect FollowerRead is true, but is %v", vol.FollowerRead)
 		return
 	}
+	if vol.enableToken != true {
+		t.Errorf("expect enableToken is true, but is %v", vol.enableToken)
+		return
+	}
 
 }
+
+func TestSetVolCapacity(t *testing.T) {
+	capacity := 200
+	reqURL := fmt.Sprintf("%v%v?name=%v&capacity=%v&authKey=%v",
+		hostAddr, proto.AdminVolSetCapacity, commonVol.Name, capacity, buildAuthKey("cfs"))
+	process(reqURL, t)
+	vol, err := server.cluster.getVol(commonVolName)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if vol.Capacity != uint64(capacity) {
+		t.Errorf("expect capacity is %v, but is %v", capacity, vol.FollowerRead)
+		return
+	}
+}
+
 func buildAuthKey(owner string) string {
 	h := md5.New()
 	h.Write([]byte(owner))

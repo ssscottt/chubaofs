@@ -356,3 +356,7 @@ func (mp *metaPartition) DeleteInodeBatch(req *proto.DeleteInodeBatchRequest, p 
 	p.PacketOkReply()
 	return
 }
+// SumInodeSize returns the sum size of inodes in the partition.
+func (mp *metaPartition) SumInodeSize() uint64 {
+	return mp.size
+}

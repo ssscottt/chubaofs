@@ -395,7 +395,7 @@ func (vol *Vol) checkAutoDataPartitionCreation(c *Cluster) {
 	if vol.capacity() == 0 {
 		return
 	}
-	usedSpace := vol.totalUsedSpace() / util.GB
+	usedSpace := vol.totalUsedSpaceByMetaReport() / util.GB
 	if usedSpace >= vol.capacity() {
 		vol.setAllDataPartitionsToReadOnly()
 		return
@@ -435,6 +435,15 @@ func (vol *Vol) setAllDataPartitionsToReadOnly() {
 
 func (vol *Vol) totalUsedSpace() uint64 {
 	return vol.dataPartitions.totalUsedSpace()
+}
+
+func (vol *Vol) totalUsedSpaceByMetaReport() (totalUsed uint64) {
+	vol.mpsLock.RLock()
+	defer vol.mpsLock.RUnlock()
+	for _, mp := range vol.MetaPartitions {
+		totalUsed = totalUsed + mp.Used
+	}
+	return
 }
 
 func (vol *Vol) updateViewCache(c *Cluster) {

@@ -37,6 +37,7 @@ func (mp *metaPartition) startSchedule(curIndex uint64) {
 	timer := time.NewTimer(time.Hour * 24 * 365)
 	timer.Stop()
 	timerCursor := time.NewTimer(intervalToSyncCursor)
+	timerCalculateSize := time.NewTimer(intervalToCalculateSize)
 	scheduleState := common.StateStopped
 	dumpFunc := func(msg *storeMsg) {
 		log.LogDebugf("[startSchedule] partitionId=%d: nowAppID"+
@@ -79,6 +80,7 @@ func (mp *metaPartition) startSchedule(curIndex uint64) {
 			select {
 			case <-stopC:
 				timer.Stop()
+				timerCursor.Stop()
 				return
 
 			case <-readyChan:
@@ -130,6 +132,18 @@ func (mp *metaPartition) startSchedule(curIndex uint64) {
 					log.LogErrorf("[startSchedule] raft submit: %s", err.Error())
 				}
 				timerCursor.Reset(intervalToSyncCursor)
+			case <-timerCalculateSize.C:
+				var (
+					size uint64
+				)
+				mp.getInodeTree().Ascend(func(i BtreeItem) bool {
+
+					inode := i.(*Inode)
+					size = inode.Size + size
+					return true
+				})
+				mp.size = size
+				timerCalculateSize.Reset(intervalToCalculateSize)
 			}
 		}
 	}(mp.stopC)

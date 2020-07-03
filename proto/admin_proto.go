@@ -27,6 +27,7 @@ const (
 	AdminAddDataReplica            = "/dataReplica/add"
 	AdminDeleteVol                 = "/vol/delete"
 	AdminUpdateVol                 = "/vol/update"
+	AdminVolSetCapacity            = "/vol/setCapacity"
 	AdminCreateVol                 = "/admin/createVol"
 	AdminGetVol                    = "/admin/getVol"
 	AdminClusterFreeze             = "/cluster/freeze"
@@ -290,6 +291,7 @@ type MetaPartitionReport struct {
 	VolName     string
 	InodeCnt    uint64
 	DentryCnt   uint64
+	Size        uint64
 }
 
 // MetaNodeHeartbeatResponse defines the response to the meta node heartbeat request.
@@ -375,6 +377,7 @@ type MetaPartitionLoadResponse struct {
 	DentryCount uint64
 	InodeCount  uint64
 	Addr        string
+	Size        uint64
 }
 
 // DataPartitionResponse defines the response from a data node to the master that is related to a data partition.

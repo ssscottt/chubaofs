@@ -1283,6 +1283,7 @@ func (c *Cluster) updateVol(name, authKey, zoneName string, capacity uint64, rep
 		oldFollowerRead bool
 		oldAuthenticate bool
 		oldEnableToken  bool
+		volUsedSpace    uint64
 		oldZoneName     string
 	)
 	if vol, err = c.getVol(name); err != nil {
@@ -1296,8 +1297,9 @@ func (c *Cluster) updateVol(name, authKey, zoneName string, capacity uint64, rep
 	if !matchKey(serverAuthKey, authKey) {
 		return proto.ErrVolAuthKeyNotMatch
 	}
-	if float64(capacity) < float64(vol.totalUsedSpace()) * 1.2 {
-		err = fmt.Errorf("capacity[%v] has to be 20 percent larger than the used space[%v]", capacity, vol.Capacity)
+	volUsedSpace = vol.totalUsedSpaceByMetaReport()
+	if float64(capacity * util.GB) < float64(volUsedSpace) * 1.2 {
+		err = fmt.Errorf("capacity[%v] has to be 20 percent larger than the used space[%v]", capacity, volUsedSpace / util.GB)
 		goto errHandler
 	}
 	if replicaNum > vol.dpReplicaNum {
