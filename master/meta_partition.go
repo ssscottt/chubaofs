@@ -559,6 +559,13 @@ func (mp *MetaPartition) createTaskToRemoveRaftMember(removePeer proto.Peer) (t 
 	return
 }
 
+func (mp *MetaPartition) createTaskToResetRaftMembers(newPeers []proto.Peer, address string) (t *proto.AdminTask, err error) {
+	req := &proto.ResetMetaPartitionRaftMemberRequest{PartitionId: mp.PartitionID, NewPeers: newPeers}
+	t = proto.NewAdminTask(proto.OpResetMetaPartitionRaftMember, address, req)
+	resetMetaPartitionTaskID(t, mp.PartitionID)
+	return
+}
+
 func (mp *MetaPartition) createTaskToDecommissionReplica(volName string, removePeer proto.Peer, addPeer proto.Peer) (t *proto.AdminTask, err error) {
 	mr, err := mp.getMetaReplicaLeader()
 	if err != nil {

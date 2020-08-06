@@ -36,6 +36,7 @@ func newDataPartitionCmd(client *master.MasterClient) *cobra.Command {
 	cmd.AddCommand(
 		newDataPartitionGetCmd(client),
 		newListCorruptDataPartitionCmd(client),
+		newResetDataPartitionCmd(client),
 		newDataPartitionDecommissionCmd(client),
 		newDataPartitionReplicateCmd(client),
 		newDataPartitionDeleteReplicaCmd(client),
@@ -46,6 +47,7 @@ func newDataPartitionCmd(client *master.MasterClient) *cobra.Command {
 const (
 	cmdDataPartitionGetShort              = "Display detail information of a data partition"
 	cmdCheckCorruptDataPartitionShort     = "Check and list unhealthy data partitions"
+	cmdResetDataPartitionShort            = "Reset corrupt data partition"
 	cmdDataPartitionDecommissionShort     = "Decommission a replication of the data partition to a new address"
 	cmdDataPartitionReplicateShort        = "Add a replication of the data partition on a new address"
 	cmdDataPartitionDeleteReplicaShort    = "Delete a replication of the data partition on a fixed address"
@@ -65,6 +67,7 @@ func newDataPartitionGetCmd(client *master.MasterClient) *cobra.Command {
 			defer func() {
 				if err != nil {
 					errout("Error: %v", err)
+					OsExitWithLogFlush()
 				}
 			}()
 			if partitionID, err = strconv.ParseUint(args[0], 10, 64); err != nil {
@@ -98,6 +101,7 @@ The "reset" command will be released in next version`,
 			defer func() {
 				if err != nil {
 					errout("Error: %v", err)
+					OsExitWithLogFlush()
 				}
 			}()
 			if diagnosis, err = client.AdminAPI().DiagnoseDataPartition(); err != nil {
@@ -169,6 +173,43 @@ The "reset" command will be released in next version`,
 	return cmd
 }
 
+func newResetDataPartitionCmd(client *master.MasterClient) *cobra.Command {
+	var cmd = &cobra.Command{
+		Use:   CliOpReset + " [DATA PARTITION ID]",
+		Short: cmdResetDataPartitionShort,
+		Long: `If more than half replicas of a partition are on the corrupt nodes, the few remaining replicas can 
+not reach an agreement with one leader. In this case, you can use the "reset" command to fix the problem, however 
+this action may lead to data loss, be careful to do this.`,
+		Args: cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			var (
+				partitionID uint64
+				confirm     string
+				err         error
+			)
+			defer func() {
+				if err != nil {
+					errout("Error:%v", err)
+					OsExitWithLogFlush()
+				}
+			}()
+			partitionID, err = strconv.ParseUint(args[0], 10, 64)
+			if err != nil {
+				return
+			}
+			stdout(fmt.Sprintf("The action may risk the danger of losing data, please confirm(y/n):"))
+			_, _ = fmt.Scanln(&confirm)
+			if "y" != confirm && "yes" != confirm {
+				return
+			}
+			if err = client.AdminAPI().ResetDataPartition(partitionID); err != nil {
+				return
+			}
+		},
+	}
+	return cmd
+}
+
 func newDataPartitionDecommissionCmd(client *master.MasterClient) *cobra.Command {
 	var cmd = &cobra.Command{
 		Use:   CliOpDecommission + " [ADDRESS] [DATA PARTITION ID]",
@@ -182,6 +223,7 @@ func newDataPartitionDecommissionCmd(client *master.MasterClient) *cobra.Command
 			defer func() {
 				if err != nil {
 					errout("Error: %v", err)
+					OsExitWithLogFlush()
 				}
 			}()
 			address := args[0]
@@ -216,6 +258,7 @@ func newDataPartitionReplicateCmd(client *master.MasterClient) *cobra.Command {
 			defer func() {
 				if err != nil {
 					errout("Error: %v", err)
+					OsExitWithLogFlush()
 				}
 			}()
 			address := args[0]
@@ -249,6 +292,7 @@ func newDataPartitionDeleteReplicaCmd(client *master.MasterClient) *cobra.Comman
 			defer func() {
 				if err != nil {
 					errout("Error: %v", err)
+					OsExitWithLogFlush()
 				}
 			}()
 			address := args[0]

@@ -16,6 +16,7 @@ package master
 
 import (
 	"fmt"
+	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util/log"
 	"math"
 	"strconv"
@@ -151,6 +152,7 @@ func (c *Cluster) checkMetaPartitionRecoveryProgress() {
 	}()
 
 	var diff float64
+	c.fullFillMpReplica()
 	c.BadMetaPartitionIds.Range(func(key, value interface{}) bool {
 		badMetaPartitionIds := value.([]uint64)
 		newBadMpIds := make([]uint64, 0)
@@ -163,11 +165,11 @@ func (c *Cluster) checkMetaPartitionRecoveryProgress() {
 			if err != nil {
 				continue
 			}
-			if len(partition.Replicas) == 0 || len(partition.Replicas) < int(vol.mpReplicaNum) {
+			if len(partition.Replicas) == 0 {
 				continue
 			}
 			diff = partition.getMinusOfMaxInodeID()
-			if diff < defaultMinusOfMaxInodeID {
+			if diff < defaultMinusOfMaxInodeID && int(vol.mpReplicaNum) <= len(partition.Replicas){
 				partition.IsRecover = false
 				partition.RLock()
 				c.syncUpdateMetaPartition(partition)
@@ -187,4 +189,54 @@ func (c *Cluster) checkMetaPartitionRecoveryProgress() {
 
 		return true
 	})
+}
+// Add replica for the partition whose replica number is less than replicaNum
+func (c *Cluster) fullFillMpReplica() {
+	c.BadMetaPartitionIds.Range(func(key, value interface{}) bool {
+		badMetaPartitionIds := value.([]uint64)
+		badAddr := key.(string)
+		newBadParitionIds := make([]uint64, 0)
+		for _, partitionID := range badMetaPartitionIds {
+			var isSkip bool
+			var err    error
+			if isSkip, err = c.checkAddMpReplica(badAddr, partitionID); err != nil {
+				log.LogWarnf(fmt.Sprintf("action[fullFillReplica], clusterID[%v], partitionID[%v], err[%v] ", c.Name, partitionID, err))
+			}
+			if !isSkip {
+				newBadParitionIds = append(newBadParitionIds, partitionID)
+			}
+		}
+		//Todo: write BadMetaPartitionIds to raft log
+		c.BadMetaPartitionIds.Store(key, newBadParitionIds)
+		return true
+	})
+
+}
+
+func (c *Cluster) checkAddMpReplica(badAddr string, partitionID uint64) (isSkip bool, err error){
+	var(
+		newPeer    proto.Peer
+		partition  *MetaPartition
+	)
+	if partition, err = c.getMetaPartitionByID(partitionID); err != nil {
+		return
+	}
+	if int(partition.ReplicaNum) == len(partition.Replicas) {
+		return
+	}
+	if _, err = partition.getMetaReplicaLeader(); err != nil {
+		log.LogWarnf(fmt.Sprintf("Action[checkAddMpReplica], partitionID[%v], no leader", partitionID))
+		return
+	}
+	if newPeer, err = c.chooseTargetMetaPartitionHost(badAddr, partition); err != nil {
+		return
+	}
+	if err = c.addMetaReplica(partition, newPeer.Addr); err != nil {
+		return
+	}
+	// Todo: What if Master changed leader before this step?
+	if int(partition.ReplicaNum) > len(partition.Replicas) {
+		isSkip = true
+	}
+	return
 }
