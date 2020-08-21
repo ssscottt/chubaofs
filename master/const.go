@@ -53,6 +53,8 @@ const (
 	nodeDeleteWorkerSleepMs = "deleteWorkerSleepMs"
 	nodeAutoRepairRateKey   = "autoRepairRate"
 	descriptionKey          = "description"
+	dpRecoverPoolSizeKey    = "dpRecoverPool"
+	mpRecoverPoolSizeKey    = "mpRecoverPool"
 )
 
 const (
@@ -61,6 +63,7 @@ const (
 	checkDataPartitionDiskErr     = "checkDataPartitionDiskErr  "
 	dataNodeOfflineErr            = "dataNodeOfflineErr "
 	diskOfflineErr                = "diskOfflineErr "
+	repairDataPartitionZoneErr    = "repairDataPartitionZoneErr "
 	handleDataPartitionOfflineErr = "handleDataPartitionOffLineErr "
 )
 
@@ -94,6 +97,8 @@ const (
 	retrySendSyncTaskInternal                    = 3 * time.Second
 	defaultRangeOfCountDifferencesAllowed        = 50
 	defaultMinusOfMaxInodeID                     = 1000
+	defaultDataPartitionsRecoverPoolSize         = 20
+	defaultMetaPartitionsRecoverPoolSize         = 20
 )
 
 const (

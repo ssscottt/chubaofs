@@ -727,3 +727,235 @@ func (mp *MetaPartition) getLiveZones(offlineAddr string) (zones []string) {
 	}
 	return
 }
+
+func (mp *MetaPartition) RepairZone(vol *Vol, c *Cluster) (err error) {
+	var (
+		zoneList      []string
+		isNeedRebalance  bool
+	)
+	mp.RLock()
+	defer mp.RUnlock()
+	if vol.zoneName == "" {
+		return
+	}
+	zoneList = strings.Split(vol.zoneName, ",")
+	if isNeedRebalance, err = mp.needToRebalanceZone(c, zoneList); err != nil {
+		return
+	}
+	if !isNeedRebalance {
+		return
+	}
+	if err = c.sendRepairMetaPartitionTask(mp, BalanceMetaZone); err != nil {
+		log.LogErrorf("action[RepairZone] clusterID[%v] vol[%v] meta partition[%v] err[%v]", c.Name, vol.Name, mp.PartitionID, err)
+		return
+	}
+	return
+}
+
+var getTargetAddressForRepairMetaZone = func (c *Cluster, nodeAddr string, mp *MetaPartition, oldHosts []string, excludeNodeSets []uint64, zoneName string) (oldAddr, addAddr string, err error){
+	var(
+		offlineZone         *Zone
+	    offlineReplica      *MetaReplica
+	    targetZone          *Zone
+		nodesetInTargetZone *nodeSet
+		replicaInTargetZone *MetaReplica
+		targetHosts         []string
+		zoneList            []string
+	)
+	zoneList = strings.Split(zoneName, ",")
+	log.LogInfof("action[getTargetAddressForRepairMetaZone],meta partitionID:%v,zone name:%v",
+		mp.PartitionID, zoneName)
+	if oldAddr, err = mp.getReplicaAddrWithDiffZone(c, zoneName); err != nil {
+		return
+	}
+	if oldAddr == "" {
+		if offlineZone, err = mp.findMaxZone(c); err != nil {
+			return
+		}
+		if offlineReplica, err = mp.getRandomReplicaByZone(c, offlineZone.name); err != nil {
+			return
+		}
+		oldAddr = offlineReplica.Addr
+	}
+	if err = c.validateDecommissionMetaPartition(mp, oldAddr); err != nil {
+		return
+	}
+	if targetZone, err = mp.findMinZone(c, zoneList); err != nil {
+		return
+	}
+	if replicaInTargetZone, err = mp.getRandomReplicaByZone(c, targetZone.name); err != nil {
+		return
+	}
+	//if there is no replica in target zone, choose random nodeset in target zone
+	if replicaInTargetZone == nil {
+		if targetHosts, _, err = targetZone.getAvailMetaNodeHosts(nil, mp.Hosts, 1); err != nil {
+			return
+		}
+		addAddr = targetHosts[0]
+		return
+	}
+
+	//if there is a replica in target zone, choose the same nodeset with this replica
+	if replicaInTargetZone.metaNode == nil {
+		err = fmt.Errorf("action[getTargetAddressForRepairMetaZone] partitionID[%v], replica[%v] metaNode not exist", mp.PartitionID, replicaInTargetZone.Addr)
+		return
+	}
+	if nodesetInTargetZone, err = targetZone.getNodeSet(replicaInTargetZone.metaNode.NodeSetID); err != nil {
+		return
+	}
+	if targetHosts, _, err = nodesetInTargetZone.getAvailMetaNodeHosts(mp.Hosts, 1); err != nil {
+		// select meta nodes from the other node set in same zone
+		excludeNodeSets = append(excludeNodeSets, nodesetInTargetZone.ID)
+		if targetHosts, _, err = targetZone.getAvailMetaNodeHosts(excludeNodeSets, mp.Hosts, 1); err != nil {
+			return
+		}
+	}
+	addAddr = targetHosts[0]
+	log.LogInfof("action[getTargetAddressForRepairMetaZone],meta partitionID:%v,zone name:[%v],old address:[%v], new address:[%v]",
+		mp.PartitionID, zoneName, oldAddr, addAddr)
+	return
+}
+
+//check if the meta partition needs to rebalance zone
+func (mp *MetaPartition) needToRebalanceZone(c *Cluster, zoneList []string) (isNeed bool, err error) {
+	var curZoneMap  map[string]uint8
+	var curZoneList []string
+	curZoneMap = make(map[string]uint8, 0)
+	curZoneList = make([]string, 0)
+	if curZoneMap, err = mp.getMetaZoneMap(c); err != nil {
+		return
+	}
+	for k := range curZoneMap {
+		curZoneList = append(curZoneList, k)
+	}
+
+	log.LogInfof("action[needToRebalanceZone],meta partitionID:%v,zone name:%v,current zones[%v]",
+		mp.PartitionID, zoneList, curZoneList)
+	if len(curZoneMap) == len(zoneList) {
+		isNeed = false
+		for _, zone := range zoneList {
+			if _, ok := curZoneMap[zone]; !ok {
+				isNeed = true
+			}
+		}
+		return
+	}
+	isNeed = true
+	return
+}
+
+//get a replica of the meta partition which is not belong to the zone list
+func (mp *MetaPartition) getReplicaAddrWithDiffZone(c *Cluster, zoneList string) (replicaAddr string, err error) {
+	for _, replica := range mp.Replicas {
+		var metaNode *MetaNode
+		var z *Zone
+		if metaNode, err = c.metaNode(replica.Addr); err != nil {
+			return
+		}
+		if z, err = c.t.getZoneByMetaNode(metaNode); err != nil {
+			return
+		}
+		if !strings.Contains(zoneList, z.name) {
+			replicaAddr = replica.Addr
+			break
+		}
+	}
+	return
+}
+
+//get the zone which holds the least replicas of the meta partition in zoneList
+func (mp *MetaPartition) findMinZone(c *Cluster, zoneList []string) (zone *Zone, err error) {
+	var replicaZoneMap map[string]uint8
+	var min            uint8
+	var zoneName       string
+	replicaZoneMap = make(map[string]uint8, 0)
+	for _, name := range zoneList {
+		replicaZoneMap[name] = 0
+	}
+	for _, host := range mp.Hosts {
+		var metaNode *MetaNode
+		var z *Zone
+		if metaNode, err = c.metaNode(host); err != nil {
+			return nil, err
+		}
+		if z, err = c.t.getZoneByMetaNode(metaNode); err != nil {
+			return nil, err
+		}
+		if _, ok := replicaZoneMap[z.name]; ok {
+			replicaZoneMap[z.name] = replicaZoneMap[z.name] + 1
+		}
+	}
+	zoneName = zoneList[0]
+	min = replicaZoneMap[zoneList[0]]
+	for k, v := range replicaZoneMap {
+		if v < min {
+			min = v
+			zoneName = k
+		}
+	}
+	if zone, err = c.t.getZone(zoneName); err != nil {
+		return
+	}
+	return
+}
+
+//get the zone which holds the most replicas of the meta partition
+func (mp *MetaPartition) findMaxZone(c *Cluster) (zone *Zone, err error){
+	var replicaZoneMap map[string]uint8
+	var max uint8
+	var zoneName string
+	replicaZoneMap = make(map[string]uint8, 0)
+
+	if replicaZoneMap, err = mp.getMetaZoneMap(c); err != nil {
+		return
+	}
+	max = replicaZoneMap[zoneName]
+	for k, v := range replicaZoneMap {
+		if v > max {
+			max = v
+			zoneName = k
+		}
+	}
+	if zone, err = c.t.getZone(zoneName); err != nil {
+		return
+	}
+	return
+}
+
+func (mp *MetaPartition) getRandomReplicaByZone(c *Cluster, zoneName string) (replica *MetaReplica, err error){
+	for _, r := range mp.Replicas {
+		var metaNode *MetaNode
+		var z *Zone
+		if metaNode, err = c.metaNode(r.Addr); err != nil {
+			return nil, err
+		}
+		if z, err = c.t.getZoneByMetaNode(metaNode); err != nil {
+			return nil, err
+		}
+		if zoneName == z.name {
+			replica = r
+		}
+	}
+	return
+}
+func (mp *MetaPartition) getMetaZoneMap (c *Cluster) (curZonesMap map[string]uint8,err error){
+	curZonesMap = make(map[string]uint8, 0)
+	for _, host := range mp.Hosts {
+		var metaNode *MetaNode
+		var zone *Zone
+		if metaNode, err = c.metaNode(host); err != nil {
+			return
+		}
+		if zone, err = c.t.getZoneByMetaNode(metaNode); err != nil {
+			return
+		}
+		if _, ok := curZonesMap[zone.name]; !ok {
+			curZonesMap[zone.name] = 1
+		}else {
+			curZonesMap[zone.name] = curZonesMap[zone.name] + 1
+		}
+	}
+	return
+}
+
+

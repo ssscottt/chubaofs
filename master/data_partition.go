@@ -680,3 +680,218 @@ func (partition *DataPartition) ToProto(c *Cluster) *proto.DataPartitionInfo {
 		FilesWithMissingReplica: partition.FilesWithMissingReplica,
 	}
 }
+
+//check if the data partition needs to rebalance zone
+func (partition *DataPartition) needToRebalanceZone(c *Cluster, zoneList []string) (isNeed bool, err error) {
+	var curZoneMap map[string]uint8
+	var curZoneList []string
+	curZoneList = make([]string, 0)
+	curZoneMap = make(map[string]uint8, 0)
+	if curZoneMap, err = partition.getDataZoneMap(c); err != nil {
+		return
+	}
+	for k := range curZoneMap {
+		curZoneList = append(curZoneList, k)
+	}
+	log.LogInfof("action[needToRebalanceZone],data partitionID:%v,zone name:%v,current zones[%v]",
+		partition.PartitionID, zoneList, curZoneList)
+	if (len(zoneList) == 1 && len(curZoneMap) == 1) || (len(curZoneMap) == 2 && (len(zoneList) == 2 || len(zoneList) == 3)){
+		isNeed = false
+		for zone := range curZoneMap {
+			if !contains(zoneList, zone) {
+				isNeed = true
+				return
+			}
+		}
+		return
+	}
+	isNeed = true
+	return
+}
+
+var getTargetAddressForRepairDataZone = func(c *Cluster, offlineAddr string, dp *DataPartition, excludeNodeSets []uint64, zoneName string) (oldAddr, newAddr string, err error){
+	var(
+		offlineZone         *Zone
+		offlineReplica      *DataReplica
+		targetZone          *Zone
+		nodesetInTargetZone *nodeSet
+		replicaInTargetZone *DataReplica
+		targetHosts         []string
+		zoneList            []string
+	)
+	zoneList = strings.Split(zoneName, ",")
+	if len(zoneList) == 3 {
+		index := dp.PartitionID % 6
+		switch dp.PartitionID % 6 < 3 {
+		case true:
+			zoneList = append(make([]string, 0), zoneList[index], zoneList[(index + 1) % 3])
+		default:
+			zoneList = append(make([]string, 0), zoneList[(index + 1) % 3], zoneList[index % 3])
+		}
+		log.LogInfof("action[balanceZone],data partitionID:%v,zone name:[%v],chosen zoneList:%v",
+			dp.PartitionID, zoneName, zoneList)
+		zoneName = strings.Join(zoneList, ",")
+	}
+
+	if oldAddr, err = dp.getReplicaAddrWithDiffZone(c, zoneName); err != nil {
+		return
+	}
+	if oldAddr == "" {
+		if offlineZone, err = dp.findMaxZone(c); err != nil {
+			return
+		}
+		if offlineReplica, err = dp.getRandomReplicaByZone(c, offlineZone.name); err != nil {
+			return
+		}
+		oldAddr = offlineReplica.Addr
+	}
+	if err = c.validateDecommissionDataPartition(dp, oldAddr); err != nil {
+		return
+	}
+	if targetZone, err = dp.findMinZone(c, zoneList); err != nil {
+		return
+	}
+	if replicaInTargetZone, err = dp.getRandomReplicaByZone(c, targetZone.name); err != nil {
+		return
+	}
+	//if there is no replica in target zone, choose random nodeset in target zone
+	if replicaInTargetZone == nil {
+		if targetHosts, _, err = targetZone.getAvailDataNodeHosts(nil, dp.Hosts, 1); err != nil {
+			return
+		}
+		newAddr = targetHosts[0]
+		return
+	}
+	//if there is a replica in target zone, choose the same nodeset with this replica
+	if replicaInTargetZone.getReplicaNode() == nil {
+		err = fmt.Errorf("action[balanceZone] partitionID[%v], replica[%v] dataNode not exist", dp.PartitionID, replicaInTargetZone.Addr)
+		return
+	}
+	if nodesetInTargetZone, err = targetZone.getNodeSet(replicaInTargetZone.dataNode.NodeSetID); err != nil {
+		return
+	}
+	if targetHosts, _, err = nodesetInTargetZone.getAvailDataNodeHosts(dp.Hosts, 1); err != nil {
+		// select data nodes from the other node set in same zone
+		excludeNodeSets = append(excludeNodeSets, nodesetInTargetZone.ID)
+		if targetHosts, _, err = targetZone.getAvailDataNodeHosts(excludeNodeSets, dp.Hosts, 1); err != nil {
+			return
+		}
+	}
+	newAddr = targetHosts[0]
+	log.LogInfof("action[balanceZone],data partitionID:%v,zone name:[%v],old address:[%v], new address:[%v]",
+		dp.PartitionID, zoneName, oldAddr, newAddr)
+	return
+}
+//get a replica of the data partition which is not belong to the zone list
+func (partition *DataPartition) getReplicaAddrWithDiffZone(c *Cluster, zoneList string) (replicaAddr string, err error) {
+	for _, replica := range partition.Replicas {
+		var dataNode *DataNode
+		var z *Zone
+		if dataNode, err = c.dataNode(replica.Addr); err != nil {
+			return
+		}
+		if z, err = c.t.getZoneByDataNode(dataNode); err != nil {
+			return
+		}
+		if !strings.Contains(zoneList, z.name) {
+			replicaAddr = replica.Addr
+			break
+		}
+	}
+	return
+}
+
+//get the zone which holds the least replicas of the data partition
+func (partition *DataPartition) findMinZone(c *Cluster, zoneList []string) (zone *Zone, err error) {
+	var replicaZoneMap map[string]uint8
+	var min            uint8
+	var zoneName       string
+	replicaZoneMap = make(map[string]uint8, 0)
+	for _, name := range zoneList {
+		replicaZoneMap[name] = 0
+	}
+	for _, host := range partition.Hosts {
+		var dataNode *DataNode
+		var z *Zone
+		if dataNode, err = c.dataNode(host); err != nil {
+			return nil, err
+		}
+		if z, err = c.t.getZoneByDataNode(dataNode); err != nil {
+			return nil, err
+		}
+		if _, ok := replicaZoneMap[z.name]; ok {
+			replicaZoneMap[z.name] = replicaZoneMap[z.name] + 1
+		}
+	}
+	zoneName = zoneList[0]
+	min = replicaZoneMap[zoneList[0]]
+	for k, v := range replicaZoneMap {
+		if v < min {
+			min = v
+			zoneName = k
+		}
+	}
+	if zone, err = c.t.getZone(zoneName); err != nil {
+		return
+	}
+	return
+}
+
+//get the zone which holds the most replicas of the data partition
+func (partition *DataPartition) findMaxZone(c *Cluster) (zone *Zone, err error){
+	var replicaZoneMap map[string]uint8
+	var max uint8
+	var zoneName string
+	replicaZoneMap = make(map[string]uint8, 0)
+	if replicaZoneMap, err = partition.getDataZoneMap(c); err != nil {
+		return
+	}
+	max = replicaZoneMap[zoneName]
+	for k, v := range replicaZoneMap {
+		if v > max {
+			max = v
+			zoneName = k
+		}
+	}
+	if zone, err = c.t.getZone(zoneName); err != nil {
+		return
+	}
+	return
+}
+
+func (partition *DataPartition) getRandomReplicaByZone(c *Cluster, zoneName string) (replica *DataReplica, err error){
+	for _, r := range partition.Replicas {
+		var dataNode *DataNode
+		var z *Zone
+		if dataNode, err = c.dataNode(r.Addr); err != nil {
+			return nil, err
+		}
+		if z, err = c.t.getZoneByDataNode(dataNode); err != nil {
+			return nil, err
+		}
+		if zoneName == z.name {
+			replica = r
+		}
+	}
+	return
+}
+
+func (partition *DataPartition) getDataZoneMap (c *Cluster) (curZonesMap map[string]uint8,err error){
+	curZonesMap = make(map[string]uint8, 0)
+	for _, host := range partition.Hosts {
+		var dataNode *DataNode
+		var zone *Zone
+		if dataNode, err = c.dataNode(host); err != nil {
+			return
+		}
+		if zone, err = c.t.getZoneByDataNode(dataNode); err != nil {
+			return
+		}
+		if _, ok := curZonesMap[zone.name]; !ok {
+			curZonesMap[zone.name] = 1
+		}else {
+			curZonesMap[zone.name] = curZonesMap[zone.name] + 1
+		}
+	}
+	return
+}

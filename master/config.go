@@ -64,6 +64,7 @@ const (
 	defaultMaxMetaPartitionCountOnEachNode             = 10000
 	defaultReplicaNum                                  = 3
 	defaultDiffSpaceUsage                              = 1024 * 1024 * 1024
+	defaultCrossZoneNum                                = 3
 )
 
 // AddrDatabase is a map that stores the address of a given host (e.g., the leader)
@@ -91,6 +92,8 @@ type clusterConfig struct {
 	heartbeatPort                       int64
 	replicaPort                         int64
 	diffSpaceUsage                      uint64
+	dataPartitionsRecoverPoolSize       uint64
+	metaPartitionsRecoverPoolSize       uint64
 }
 
 func newClusterConfig() (cfg *clusterConfig) {
@@ -107,6 +110,8 @@ func newClusterConfig() (cfg *clusterConfig) {
 	cfg.MetaNodeThreshold = defaultMetaPartitionMemUsageThreshold
 	cfg.metaNodeReservedMem = defaultMetaNodeReservedMem
 	cfg.diffSpaceUsage = defaultDiffSpaceUsage
+	cfg.dataPartitionsRecoverPoolSize=defaultDataPartitionsRecoverPoolSize
+	cfg.metaPartitionsRecoverPoolSize=defaultMetaPartitionsRecoverPoolSize
 	return
 }
 
