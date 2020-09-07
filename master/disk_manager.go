@@ -17,6 +17,7 @@ package master
 import (
 	"fmt"
 	"github.com/chubaofs/chubaofs/util/log"
+	"strings"
 	"time"
 )
 
@@ -84,11 +85,12 @@ func (c *Cluster) fullFillReplica() {
 	c.BadDataPartitionIds.Range(func(key, value interface{}) bool {
 		badDataPartitionIds := value.([]uint64)
 		badDiskAddr := key.(string)
+		badAddr := strings.Split(badDiskAddr, ":")[0]
 		newBadParitionIds := make([]uint64, 0)
 		for _, partitionID := range badDataPartitionIds {
 			var isSkip bool
 			var err    error
-			if isSkip, err = c.checkAddDataReplica(badDiskAddr, partitionID); err != nil {
+			if isSkip, err = c.checkAddDataReplica(badAddr, partitionID); err != nil {
 				log.LogWarnf(fmt.Sprintf("action[fullFillReplica], clusterID[%v], partitionID[%v], err[%v] ", c.Name, partitionID, err))
 			}
 			if !isSkip {

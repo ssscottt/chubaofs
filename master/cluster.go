@@ -1383,7 +1383,7 @@ func (c *Cluster) forceRemoveDataReplica(dp *DataPartition, addrs []string) (err
 			log.LogErrorf("action[forceRemoveDataReplica],vol[%v],data partition[%v],err[%v]", dp.VolName, dp.PartitionID, err)
 		}
 	}()
-	// Only after reset peers succeed in remote datanode, the meta data can be updated
+	// Only after reset peers succeed in remote datanode, the data data can be updated
 	newHosts := make([]string, 0, len(dp.Hosts)-len(addrs))
 	newPeers := make([]proto.Peer, 0, len(dp.Peers)-len(addrs))
 	for _, host := range dp.Hosts {
@@ -1396,7 +1396,7 @@ func (c *Cluster) forceRemoveDataReplica(dp *DataPartition, addrs []string) (err
 		var dataNode *DataNode
 		dataNode, err = c.dataNode(host)
 		if err != nil {
-			dp.Unlock()
+			dp.RUnlock()
 			return
 		}
 		peer := proto.Peer{

@@ -19,6 +19,7 @@ import (
 	"github.com/chubaofs/chubaofs/proto"
 	"github.com/chubaofs/chubaofs/util/log"
 	"strconv"
+	"strings"
 	"time"
 	"math"
 )
@@ -195,7 +196,8 @@ func (c *Cluster) checkMetaPartitionRecoveryProgress() {
 func (c *Cluster) fullFillMpReplica() {
 	c.BadMetaPartitionIds.Range(func(key, value interface{}) bool {
 		badMetaPartitionIds := value.([]uint64)
-		badAddr := key.(string)
+		badDiskAddr := key.(string)
+		badAddr := strings.Split(badDiskAddr, ":")[0]
 		newBadParitionIds := make([]uint64, 0)
 		for _, partitionID := range badMetaPartitionIds {
 			var isSkip bool
