@@ -768,7 +768,11 @@ func (dp *DataPartition) ChangeRaftMember(changeType raftProto.ConfChangeType, p
 	resp, err = dp.raftPartition.ChangeMember(changeType, peer, context)
 	return
 }
-
+// ResetRaftMember is a wrapper function of changing the raft member.
+func (dp *DataPartition) ResetRaftMember(peers []raftProto.Peer, context []byte) (err error) {
+	err = dp.raftPartition.ResetMember(peers, context)
+	return
+}
 //
 func (dp *DataPartition) canRemoveSelf() (canRemove bool, err error) {
 	var partition *proto.DataPartitionInfo

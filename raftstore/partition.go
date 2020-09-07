@@ -40,6 +40,9 @@ type Partition interface {
 	// ChaneMember submits member change event and information to raft log.
 	ChangeMember(changeType proto.ConfChangeType, peer proto.Peer, context []byte) (resp interface{}, err error)
 
+	// ResetMember reset members directly with no submit, be carefully calling this method. It is used only when dead replicas > live ones and can no longer be alive
+	ResetMember(peers []proto.Peer, context []byte) (err error)
+
 	// Stop removes the raft partition from raft server and shuts down this partition.
 	Stop() error
 
@@ -88,7 +91,10 @@ func (p *partition) ChangeMember(changeType proto.ConfChangeType, peer proto.Pee
 	resp, err = future.Response()
 	return
 }
-
+func (p *partition) ResetMember(peers []proto.Peer, context []byte) (err error) {
+	err = p.raft.ResetMember(p.id, peers, context)
+	return
+}
 // Stop removes the raft partition from raft server and shuts down this partition.
 func (p *partition) Stop() (err error) {
 	err = p.raft.RemoveRaft(p.id)

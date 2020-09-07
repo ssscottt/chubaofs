@@ -38,6 +38,8 @@ type clusterValue struct {
 	DataNodeDeleteLimitRate     uint64
 	MetaNodeDeleteBatchCount    uint64
 	MetaNodeDeleteWorkerSleepMs uint64
+	BadDataPartitionIds         map[string]interface{}
+	BadMetaPartitionIds         map[string]interface{}
 }
 
 func newClusterValue(c *Cluster) (cv *clusterValue) {
@@ -49,6 +51,23 @@ func newClusterValue(c *Cluster) (cv *clusterValue) {
 		MetaNodeDeleteWorkerSleepMs: c.cfg.MetaNodeDeleteWorkerSleepMs,
 		DisableAutoAllocate:         c.DisableAutoAllocate,
 	}
+	tmpBadDpIds := make(map[string]interface{}, 0)
+	c.BadDataPartitionIds.Range(func(key, value interface{}) bool {
+		badDataPartitionIds := value.([]uint64)
+		badDiskAddr := key.(string)
+		tmpBadDpIds[badDiskAddr] = badDataPartitionIds
+		return true
+	})
+	cv.BadDataPartitionIds = tmpBadDpIds
+
+	tmpBadMpIds := make(map[string]interface{}, 0)
+	c.BadMetaPartitionIds.Range(func(key, value interface{}) bool {
+		badMetaPartitionIds := value.([]uint64)
+		badDiskAddr := key.(string)
+		tmpBadMpIds[badDiskAddr] = badMetaPartitionIds
+		return true
+	})
+	cv.BadMetaPartitionIds = tmpBadMpIds
 	return cv
 }
 
@@ -525,7 +544,17 @@ func (c *Cluster) updateMetaNodeDeleteWorkerSleepMs(val uint64) {
 func (c *Cluster) updateDataNodeDeleteLimitRate(val uint64) {
 	atomic.StoreUint64(&c.cfg.DataNodeDeleteLimitRate, val)
 }
+func (c *Cluster) updateBadDataPartitionIds(badDpIds map[string]interface{}) {
+	for badAddr := range badDpIds {
+		c.BadDataPartitionIds.Store(badAddr, badDpIds[badAddr])
+	}
+}
 
+func (c *Cluster) updateBadMetaPartitionIds(badMpIds map[string]interface{}) {
+	for badAddr := range badMpIds {
+		c.BadMetaPartitionIds.Store(badAddr, badMpIds[badAddr])
+	}
+}
 func (c *Cluster) loadClusterValue() (err error) {
 	result, err := c.fsm.store.SeekForPrefix([]byte(clusterPrefix))
 	if err != nil {
@@ -543,6 +572,8 @@ func (c *Cluster) loadClusterValue() (err error) {
 		c.updateMetaNodeDeleteBatchCount(cv.MetaNodeDeleteBatchCount)
 		c.updateMetaNodeDeleteWorkerSleepMs(cv.MetaNodeDeleteWorkerSleepMs)
 		c.updateDataNodeDeleteLimitRate(cv.DataNodeDeleteLimitRate)
+		c.updateBadDataPartitionIds(cv.BadDataPartitionIds)
+		c.updateBadMetaPartitionIds(cv.BadMetaPartitionIds)
 		log.LogInfof("action[loadClusterValue], metaNodeThreshold[%v]", cv.Threshold)
 	}
 	return

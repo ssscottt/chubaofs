@@ -42,6 +42,7 @@ func (c *Cluster) checkDiskRecoveryProgress() {
 				"checkDiskRecoveryProgress occurred panic")
 		}
 	}()
+	c.fullFillReplica()
 	c.BadDataPartitionIds.Range(func(key, value interface{}) bool {
 		badDataPartitionIds := value.([]uint64)
 		newBadDpIds := make([]uint64, 0)
@@ -54,10 +55,10 @@ func (c *Cluster) checkDiskRecoveryProgress() {
 			if err != nil {
 				continue
 			}
-			if len(partition.Replicas) == 0 || len(partition.Replicas) < int(vol.dpReplicaNum) {
+			if len(partition.Replicas) == 0 {
 				continue
 			}
-			if partition.isDataCatchUp() {
+			if partition.isDataCatchUp() && len(partition.Replicas) >= int(vol.dpReplicaNum){
 				partition.isRecover = false
 				partition.RLock()
 				c.syncUpdateDataPartition(partition)
@@ -78,7 +79,56 @@ func (c *Cluster) checkDiskRecoveryProgress() {
 		return true
 	})
 }
+// Add replica for the partition whose replica number is less than replicaNum
+func (c *Cluster) fullFillReplica() {
+	c.BadDataPartitionIds.Range(func(key, value interface{}) bool {
+		badDataPartitionIds := value.([]uint64)
+		badDiskAddr := key.(string)
+		newBadParitionIds := make([]uint64, 0)
+		for _, partitionID := range badDataPartitionIds {
+			var isSkip bool
+			var err    error
+			if isSkip, err = c.checkAddDataReplica(badDiskAddr, partitionID); err != nil {
+				log.LogWarnf(fmt.Sprintf("action[fullFillReplica], clusterID[%v], partitionID[%v], err[%v] ", c.Name, partitionID, err))
+			}
+			if !isSkip {
+				newBadParitionIds = append(newBadParitionIds, partitionID)
+			}
+		}
+		//Todo: write BadDataPartitionIds to raft log
+		c.BadDataPartitionIds.Store(key, newBadParitionIds)
+		return true
+	})
 
+}
+
+func (c *Cluster) checkAddDataReplica(badDiskAddr string, partitionID uint64) (isSkip bool, err error){
+	var(
+		newAddr    string
+		partition  *DataPartition
+	)
+	if partition, err = c.getDataPartitionByID(partitionID); err != nil {
+		return
+	}
+	if int(partition.ReplicaNum) == len(partition.Replicas) {
+		return
+	}
+	if leaderAddr := partition.getLeaderAddr(); leaderAddr == "" {
+		log.LogWarnf(fmt.Sprintf("Action[checkAddReplica], partitionID[%v], no leader", partitionID))
+		return
+	}
+	if newAddr, err = c.chooseTargetDataPartitionHost(badDiskAddr, partition); err != nil {
+		return
+	}
+	if err = c.addDataReplica(partition, newAddr); err != nil {
+		return
+	}
+	// Todo: What if Master changed leader before this step?
+	if int(partition.ReplicaNum) > len(partition.Replicas) {
+		isSkip = true
+	}
+	return
+}
 func (c *Cluster) decommissionDisk(dataNode *DataNode, badDiskPath string, badPartitions []*DataPartition) (err error) {
 	msg := fmt.Sprintf("action[decommissionDisk], Node[%v] OffLine,disk[%v]", dataNode.Addr, badDiskPath)
 	log.LogWarn(msg)

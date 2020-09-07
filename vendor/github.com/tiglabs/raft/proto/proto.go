@@ -24,7 +24,10 @@ type (
 	ConfChangeType byte
 	PeerType       byte
 )
-
+type ResetPeers struct {
+	NewPeers []Peer
+	Context  []byte
+}
 const (
 	ReqMsgAppend MsgType = iota
 	ReqMsgVote

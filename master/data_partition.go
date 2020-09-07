@@ -134,6 +134,11 @@ func (partition *DataPartition) createTaskToDeleteDataPartition(addr string) (ta
 	partition.resetTaskID(task)
 	return
 }
+func (partition *DataPartition) createTaskToResetRaftMembers(newPeers []proto.Peer, address string) (task *proto.AdminTask, err error) {
+	task = proto.NewAdminTask(proto.OpResetDataPartitionRaftMember, address, newResetDataPartitionRaftMemberRequest(partition.PartitionID, newPeers))
+	partition.resetTaskID(task)
+	return
+}
 
 func (partition *DataPartition) resetTaskID(t *proto.AdminTask) {
 	t.ID = fmt.Sprintf("%v_DataPartitionID[%v]", t.ID, partition.PartitionID)
@@ -504,7 +509,7 @@ func (partition *DataPartition) update(action, volName string, newPeers []proto.
 		return errors.Trace(err, "action[%v] update partition[%v] vol[%v] failed", action, partition.PartitionID, volName)
 	}
 	msg := fmt.Sprintf("action[%v] success,vol[%v] partitionID:%v "+
-		"oldHosts:%v newHosts:%v,oldPees[%v],newPeers[%v]",
+		"oldHosts:%v newHosts:%v,oldPeers[%v],newPeers[%v]",
 		action, volName, partition.PartitionID, orgHosts, partition.Hosts, oldPeers, partition.Peers)
 	log.LogInfo(msg)
 	return
