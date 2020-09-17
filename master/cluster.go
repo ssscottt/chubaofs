@@ -359,26 +359,31 @@ func (c *Cluster) repairDataPartition() {
 		for {
 			select {
 			case task := <-c.dpRepairChan:
-				var dp *DataPartition
-				if dp, err = c.getDataPartitionByID(task.Pid); err != nil {
-					goto errorHandler
-				}
-				switch task.RType {
-				case BalanceDataZone:
-					if err = c.decommissionDataPartition("", dp, getTargetAddressForBalanceDataPartitionZone, balanceDataPartitionZoneErr, "", false); err != nil {
-						goto errorHandler
+				go func() {
+					defer func() {
+						if err != nil {
+							log.LogErrorf("ClusterID[%v], Action[repairDataPartition], err[%v]", c.Name, err)
+						}
+					}()
+					var dp *DataPartition
+					if dp, err = c.getDataPartitionByID(task.Pid); err != nil {
+						return
 					}
-				default:
-					err = fmt.Errorf("action[repairDataPartition] unknown repair task type")
-					goto errorHandler
-				}
-				Warn(c.Name, fmt.Sprintf("action[repairDataPartition] clusterID[%v] vol[%v] data partition[%v] "+
-					"Repair success, type[%v]", c.Name, dp.VolName, dp.PartitionID, task.RType))
+					switch task.RType {
+					case BalanceDataZone:
+						if err = c.decommissionDataPartition("", dp, getTargetAddressForBalanceDataPartitionZone, balanceDataPartitionZoneErr, "", false); err != nil {
+							return
+						}
+					default:
+						err = fmt.Errorf("action[repairDataPartition] unknown repair task type")
+						return
+					}
+					Warn(c.Name, fmt.Sprintf("action[repairDataPartition] clusterID[%v] vol[%v] data partition[%v] "+
+						"Repair success, type[%v]", c.Name, dp.VolName, dp.PartitionID, task.RType))
+				}()
 			default:
 				continue
 			}
-		errorHandler:
-			log.LogErrorf("ClusterID[%v], Action[repairDataPartition], err[%v]", c.Name, err)
 		}
 	}()
 }
@@ -389,26 +394,31 @@ func (c *Cluster) repairMetaPartition() {
 		for {
 			select {
 			case task := <-c.mpRepairChan:
-				var mp *MetaPartition
-				if mp, err = c.getMetaPartitionByID(task.Pid); err != nil {
-					goto errorHandler
-				}
-				switch task.RType {
-				case BalanceMetaZone:
-					if err = c.decommissionMetaPartition("", mp, getTargetAddressForRepairMetaZone, false); err != nil {
-						goto errorHandler
+				go func() {
+					defer func() {
+						if err != nil {
+							log.LogErrorf("ClusterID[%v], Action[repairMetaPartition], err[%v]", c.Name, err)
+						}
+					}()
+					var mp *MetaPartition
+					if mp, err = c.getMetaPartitionByID(task.Pid); err != nil {
+						return
 					}
-				default:
-					err = fmt.Errorf("action[repairMetaPartition] unknown repair task type")
-					goto errorHandler
-				}
-				Warn(c.Name, fmt.Sprintf("action[repairMetaPartition] clusterID[%v] vol[%v] meta partition[%v] "+
-					"Repair success, task type[%v]", c.Name, mp.volName, mp.PartitionID, task.RType))
+					switch task.RType {
+					case BalanceMetaZone:
+						if err = c.decommissionMetaPartition("", mp, getTargetAddressForRepairMetaZone, false); err != nil {
+							return
+						}
+					default:
+						err = fmt.Errorf("action[repairMetaPartition] unknown repair task type")
+						return
+					}
+					Warn(c.Name, fmt.Sprintf("action[repairMetaPartition] clusterID[%v] vol[%v] meta partition[%v] "+
+						"Repair success, task type[%v]", c.Name, mp.volName, mp.PartitionID, task.RType))
+				}()
 			default:
 				continue
 			}
-		errorHandler:
-			log.LogErrorf("ClusterID[%v], Action[repairMetaPartition], err[%v]", c.Name, err)
 		}
 	}()
 }
@@ -1304,6 +1314,11 @@ func (partition *DataPartition) RepairZone(vol *Vol, c *Cluster) (err error) {
 		log.LogWarnf("action[RepairZone], vol[%v], zoneName[%v], dpReplicaNum[%v] can not be automatically repaired", vol.Name, vol.zoneName, vol.dpReplicaNum)
 		return
 	}
+	rps := partition.liveReplicas(defaultDataPartitionTimeOutSec)
+	if len(rps) < int(vol.dpReplicaNum) {
+		log.LogWarnf("action[RepairZone], vol[%v], zoneName[%v], live Replicas [%v] less than dpReplicaNum[%v], can not be automatically repaired", vol.Name, vol.zoneName, len(rps), vol.dpReplicaNum)
+		return
+	}
 	zoneList = strings.Split(vol.zoneName, ",")
 	if len(partition.Replicas) != int(vol.dpReplicaNum) {
 		log.LogWarnf("action[RepairZone], data replica length[%v] not equal to dpReplicaNum[%v]", len(partition.Replicas), vol.dpReplicaNum)
@@ -1313,16 +1328,16 @@ func (partition *DataPartition) RepairZone(vol *Vol, c *Cluster) (err error) {
 		log.LogWarnf("action[RepairZone], data partition[%v] is recovering", partition.PartitionID)
 		return
 	}
-	if isNeedBalance, err = partition.needToRebalanceZone(c, zoneList); err != nil {
-		return
-	}
-	if !isNeedBalance {
-		return
-	}
 	var dpInRecover int
 	dpInRecover = c.dataPartitionInRecovering()
 	if int32(dpInRecover) >= c.cfg.dataPartitionsRecoverPoolSize {
 		log.LogWarnf("action[repairDataPartition] clusterID[%v] Recover pool is full, recover partition[%v], pool size[%v]", c.Name, dpInRecover, c.cfg.dataPartitionsRecoverPoolSize)
+		return
+	}
+	if isNeedBalance, err = partition.needToRebalanceZone(c, zoneList); err != nil {
+		return
+	}
+	if !isNeedBalance {
 		return
 	}
 	if err = c.sendRepairDataPartitionTask(partition, BalanceDataZone); err != nil {
