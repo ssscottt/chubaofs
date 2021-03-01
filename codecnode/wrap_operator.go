@@ -27,8 +27,8 @@ import (
 	"github.com/chubaofs/chubaofs/util/exporter"
 	"github.com/chubaofs/chubaofs/util/log"
 
-	"github.com/chubaofs/chubaofs/sdk/meta"
 	"github.com/chubaofs/chubaofs/sdk/data/stream"
+	"github.com/chubaofs/chubaofs/sdk/meta"
 
 	echandler "github.com/chubaofs/chubaofs/util/ec"
 )
@@ -192,19 +192,20 @@ func (s *CodecServer) handleEcMigrationTask(p *repl.Packet, c *net.TCPConn) {
 				return
 			}
 			log.LogDebug("PartitionId: " + strconv.FormatUint(pid, 10))
-
-			dataNum, parityNum, extentSize, stripeSize, err := ecl.GetPartitionInfo(pid)
+			//	DefaultStripeUnitSize = 64 * KB
+			//	DefaultExtentFileSize = 4 * MB
+			dataNum, parityNum, ecExtentFileSize, stripeUnitSize, err := ecl.GetPartitionInfo(pid)
 			if err != nil {
 				return
 			}
-			log.LogDebugf("PartitionInfo: dataNum(%v), parityNum(%v), extentSize(%v), stripeSize(%v)",
-				dataNum, parityNum, extentSize, stripeSize)
+			log.LogDebugf("PartitionInfo: dataNum(%v), parityNum(%v), ecExtentFileSize(%v), stripeUnitSize(%v)",
+				dataNum, parityNum, ecExtentFileSize, stripeUnitSize)
 
-			ech, err := echandler.NewEcHandler(int(stripeSize), int(dataNum), int(parityNum))
+			ech, err := echandler.NewEcHandler(int(stripeUnitSize), int(dataNum), int(parityNum))
 			if err != nil {
 				return
 			}
-
+			//the ec extent' is different with datanode extent. Max size of ec extent is 4M, Max size of datanode extent is 128M,
 			extents, err := ecl.CreateExtentsForWrite(pid, uint64(size))
 			if err != nil {
 				return
@@ -214,38 +215,41 @@ func (s *CodecServer) handleEcMigrationTask(p *repl.Packet, c *net.TCPConn) {
 				log.LogDebug("CreateExtents: " + string(b))
 			}
 
-			outbufs := make([][]byte, dataNum + parityNum)
-			for i := 0; i < int(dataNum + parityNum); i++ {
-				outbufs[i] = make([]byte, extentSize)
+			outbufs := make([][]byte, dataNum+parityNum)
+			for i := 0; i < int(dataNum+parityNum); i++ {
+				outbufs[i] = make([]byte, ecExtentFileSize)
 			}
 
 			extentKeys = make([]proto.ExtentKey, len(extents))
 
 			offset := 0
 			for k, eid := range extents {
-				n := int(extentSize * dataNum)
-				if n > size - offset {
-					n = size - offset
+				var extentFileWriteSize int
+				if size-offset < int(ecExtentFileSize*dataNum) {
+					extentFileWriteSize = size - offset
+				} else {
+					extentFileWriteSize = int(ecExtentFileSize * dataNum)
 				}
+				//ecExtentWriteStripeNum defines actual stripe num to write on this extent
+				ecExtentWriteStripeNum := uint32(extentFileWriteSize-1)/(stripeUnitSize*dataNum) + 1
+				//initial the inbuf ecExtentWriteStripeNum times of (stripeUnitSize * dataNum), the spare bytes is set zero
+				//thus every time we can write a total stripe to ecNode.
+				inbuf := make([]byte, stripeUnitSize*dataNum*ecExtentWriteStripeNum)
 
-				nStripe := uint32(n - 1) / (stripeSize * dataNum) + 1
-
-				inbuf := make([]byte, stripeSize * dataNum * nStripe)
-
-				if n, err = ec.Read(inode, inbuf, offset, n); err != nil {
+				if extentFileWriteSize, err = ec.Read(inode, inbuf, offset, extentFileWriteSize); err != nil {
 					return
 				}
 
-				for i := uint32(0); i < nStripe; i++ {
+				for i := uint32(0); i < ecExtentWriteStripeNum; i++ {
 					var shards [][]byte
-					if shards, err = ech.Encode(inbuf[stripeSize * dataNum * i : stripeSize * dataNum * (i + 1)]); err != nil {
+					if shards, err = ech.Encode(inbuf[stripeUnitSize*dataNum*i : stripeUnitSize*dataNum*(i+1)]); err != nil {
 						return
 					}
 					for j, shard := range shards {
-						copy(outbufs[j][stripeSize * i : stripeSize * (i + 1)], shard)
+						copy(outbufs[j][stripeUnitSize*i:stripeUnitSize*(i+1)], shard)
 					}
 				}
-				if err = ecl.Write(outbufs, nStripe, eid, pid); err != nil {
+				if err = ecl.Write(outbufs, ecExtentWriteStripeNum, eid, pid); err != nil {
 					return
 				}
 
@@ -253,9 +257,9 @@ func (s *CodecServer) handleEcMigrationTask(p *repl.Packet, c *net.TCPConn) {
 				extentKeys[k].PartitionId = pid
 				extentKeys[k].ExtentId = eid
 				extentKeys[k].ExtentOffset = 0
-				extentKeys[k].Size = uint32(n)
+				extentKeys[k].Size = uint32(extentFileWriteSize)
 
-				offset += n
+				offset += extentFileWriteSize
 			}
 
 			if b, err := json.Marshal(extentKeys); err == nil {
